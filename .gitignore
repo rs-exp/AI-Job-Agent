@@ -1,0 +1,15 @@
+﻿venv/
+.env
+__pycache__/
+*.pyc
+logs/
+.vs/
+.git_broken/
+data/source_check_results.csv
+
+/jobscraper_test.py
+/sc.py
+/scraper2.py
+/scraper3.py
+/scraper4.py
+/sources.csv
