@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from time import perf_counter
 
 from database.job_repository import JobRepository
+from scrapers.arbeitnow_scraper import ArbeitNowScraper
 from scrapers.base_scraper import BaseScraper
 from scrapers.remotive_scraper import RemotiveScraper
 from utils.logger import get_logger
@@ -31,6 +32,7 @@ class JobCollector:
 
         self.scrapers: list[BaseScraper] = [
             RemotiveScraper(),
+            ArbeitNowScraper(),
         ]
 
     def run(self) -> CollectionSummary:
