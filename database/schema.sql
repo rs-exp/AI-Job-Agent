@@ -1,19 +1,139 @@
+-- =========================================================
+-- AI JOB AGENT DATABASE SCHEMA
+-- =========================================================
+
+
+-- =========================================================
+-- 1. JOB SOURCES
+-- Stores websites, APIs, ATS platforms, and portals
+-- that the AI Job Agent can test or scrape.
+-- =========================================================
+
 CREATE TABLE IF NOT EXISTS job_sources (
-    id SERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
+
     source_name VARCHAR(100) NOT NULL,
     source_url TEXT NOT NULL UNIQUE,
     source_type VARCHAR(50) NOT NULL,
-    target_role VARCHAR(100),
-    status VARCHAR(50) DEFAULT 'not_tested',
+
+    target_role VARCHAR(150),
+
+    status VARCHAR(50) NOT NULL DEFAULT 'not_tested',
     notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+
+-- =========================================================
+-- 2. SOURCE CHECK RESULTS
+-- Stores every accessibility test performed against a source.
+-- One source can have many historical check results.
+-- =========================================================
+
 CREATE TABLE IF NOT EXISTS source_check_results (
-    id SERIAL PRIMARY KEY,
-    source_id INTEGER REFERENCES job_sources(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+
+    source_id BIGINT NOT NULL
+        REFERENCES job_sources(id)
+        ON DELETE CASCADE,
+
     check_status VARCHAR(50) NOT NULL,
     http_status_code INTEGER,
+
     error_message TEXT,
-    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    response_time_ms INTEGER,
+
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+
+-- =========================================================
+-- 3. JOBS
+-- Stores standardized jobs collected from all sources.
+-- URL is unique to prevent duplicate job entries.
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS jobs (
+    id BIGSERIAL PRIMARY KEY,
+
+    source VARCHAR(100) NOT NULL,
+
+    title VARCHAR(255) NOT NULL,
+    company VARCHAR(255) NOT NULL,
+    location VARCHAR(255),
+
+    salary TEXT,
+    description TEXT,
+
+    url TEXT NOT NULL UNIQUE,
+
+    employment_type VARCHAR(100),
+    posted_date TIMESTAMPTZ,
+
+    remote BOOLEAN NOT NULL DEFAULT FALSE,
+
+    status VARCHAR(50) NOT NULL DEFAULT 'new',
+
+    collected_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- =========================================================
+-- 4. INDEXES FOR JOB SOURCES
+-- =========================================================
+
+CREATE INDEX IF NOT EXISTS idx_job_sources_source_name
+ON job_sources(source_name);
+
+CREATE INDEX IF NOT EXISTS idx_job_sources_status
+ON job_sources(status);
+
+CREATE INDEX IF NOT EXISTS idx_job_sources_source_type
+ON job_sources(source_type);
+
+
+-- =========================================================
+-- 5. INDEXES FOR SOURCE CHECK RESULTS
+-- =========================================================
+
+CREATE INDEX IF NOT EXISTS idx_source_check_results_source_id
+ON source_check_results(source_id);
+
+CREATE INDEX IF NOT EXISTS idx_source_check_results_check_status
+ON source_check_results(check_status);
+
+CREATE INDEX IF NOT EXISTS idx_source_check_results_checked_at
+ON source_check_results(checked_at DESC);
+
+
+-- =========================================================
+-- 6. INDEXES FOR JOBS
+-- =========================================================
+
+CREATE INDEX IF NOT EXISTS idx_jobs_source
+ON jobs(source);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_title
+ON jobs(title);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_company
+ON jobs(company);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_location
+ON jobs(location);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_status
+ON jobs(status);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_remote
+ON jobs(remote);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_posted_date
+ON jobs(posted_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_collected_at
+ON jobs(collected_at DESC);
