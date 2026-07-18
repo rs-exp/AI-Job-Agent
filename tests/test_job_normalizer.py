@@ -1,0 +1,109 @@
+import pytest
+
+from models.job import Job
+from services.job_normalizer import JobNormalizer
+
+
+@pytest.fixture
+def normalizer() -> JobNormalizer:
+    return JobNormalizer()
+
+
+def test_normalize_cleans_text_and_html(
+    normalizer: JobNormalizer,
+) -> None:
+    job = Job(
+        title="  DevOps   Engineer  ",
+        company="  Example &amp; Company ",
+        location="  Pune,   India ",
+        url=" https://example.com/jobs/1 ",
+        source=" Remotive ",
+        description=(
+            "<p>Manage <strong>cloud</strong> systems.</p>"
+            "<p>Support CI/CD pipelines.</p>"
+        ),
+        salary="  ₹10   LPA ",
+        employment_type="full time",
+    )
+
+    normalized_job = normalizer.normalize(job)
+
+    assert normalized_job.title == "DevOps Engineer"
+    assert normalized_job.company == "Example & Company"
+    assert normalized_job.location == "Pune, India"
+    assert normalized_job.url == "https://example.com/jobs/1"
+    assert normalized_job.source == "Remotive"
+    assert normalized_job.description == (
+        "Manage cloud systems. Support CI/CD pipelines."
+    )
+    assert normalized_job.salary == "₹10 LPA"
+    assert normalized_job.employment_type == "Full-time"
+
+
+def test_normalize_sets_missing_location(
+    normalizer: JobNormalizer,
+) -> None:
+    job = Job(
+        title="Cloud Support Engineer",
+        company="Example Company",
+        location="",
+        url="https://example.com/jobs/2",
+        source="ArbeitNow",
+    )
+
+    normalized_job = normalizer.normalize(job)
+
+    assert normalized_job.location == "Not specified"
+
+
+def test_normalize_infers_remote_job(
+    normalizer: JobNormalizer,
+) -> None:
+    job = Job(
+        title="Site Reliability Engineer",
+        company="Example Company",
+        location="India",
+        url="https://example.com/jobs/3",
+        source="Greenhouse",
+        description="This is a fully remote role.",
+        remote=False,
+    )
+
+    normalized_job = normalizer.normalize(job)
+
+    assert normalized_job.remote is True
+
+
+def test_normalize_preserves_explicit_remote_value(
+    normalizer: JobNormalizer,
+) -> None:
+    job = Job(
+        title="Platform Engineer",
+        company="Example Company",
+        location="Mumbai",
+        url="https://example.com/jobs/4",
+        source="Remotive",
+        remote=True,
+    )
+
+    normalized_job = normalizer.normalize(job)
+
+    assert normalized_job.remote is True
+
+
+def test_normalize_rejects_missing_required_field(
+    normalizer: JobNormalizer,
+) -> None:
+    job = Job(
+        title="   ",
+        company="Example Company",
+        location="Pune",
+        url="https://example.com/jobs/5",
+        source="Greenhouse",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Missing required job fields: title",
+    ):
+        normalizer.normalize(job)

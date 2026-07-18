@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 
@@ -24,7 +24,9 @@ class Job:
     posted_date: Optional[datetime] = None
     remote: bool = False
 
-    collected_at: datetime = field(default_factory=datetime.utcnow)
+    collected_at: datetime = field(
+    default_factory=lambda: datetime.now(UTC)
+)
 
     def validate(self) -> None:
         """

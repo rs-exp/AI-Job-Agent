@@ -4,10 +4,9 @@ from time import perf_counter
 from database.job_repository import JobRepository
 from scrapers.arbeitnow_scraper import ArbeitNowScraper
 from scrapers.base_scraper import BaseScraper
+from scrapers.greenhouse_scraper import GreenhouseScraper
 from scrapers.remotive_scraper import RemotiveScraper
-from scrapers.greenhouse_scraper import (
-    GreenhouseScraper
-)
+from services.job_normalizer import JobNormalizer
 from utils.logger import get_logger
 
 
@@ -27,11 +26,13 @@ class CollectionSummary:
 
 class JobCollector:
     """
-    Runs configured scrapers and stores collected jobs.
+    Runs configured scrapers, normalizes jobs,
+    and stores them in PostgreSQL.
     """
 
     def __init__(self) -> None:
         self.repository = JobRepository()
+        self.normalizer = JobNormalizer()
 
         self.scrapers: list[BaseScraper] = [
             RemotiveScraper(),
@@ -52,11 +53,42 @@ class JobCollector:
                 jobs = scraper.start()
                 summary.jobs_received += len(jobs)
 
-                inserted, duplicates, failed = self.repository.save_jobs(jobs)
+                normalized_jobs = []
+
+                for job in jobs:
+                    try:
+                        normalized_job = self.normalizer.normalize(job)
+                        normalized_jobs.append(normalized_job)
+
+                    except Exception as error:
+                        summary.failed_jobs += 1
+
+                        logger.exception(
+                            "Failed to normalize job '%s' "
+                            "from %s: %s",
+                            getattr(job, "title", "Unknown"),
+                            scraper.source_name,
+                            error,
+                        )
+
+                inserted, duplicates, failed = (
+                    self.repository.save_jobs(
+                        normalized_jobs
+                    )
+                )
 
                 summary.jobs_inserted += inserted
                 summary.duplicates += duplicates
                 summary.failed_jobs += failed
+
+                logger.info(
+                    "%s normalization completed: "
+                    "received=%s, normalized=%s, failed=%s",
+                    scraper.source_name,
+                    len(jobs),
+                    len(normalized_jobs),
+                    len(jobs) - len(normalized_jobs),
+                )
 
             except Exception as error:
                 summary.failed_sources += 1
