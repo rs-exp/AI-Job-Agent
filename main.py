@@ -21,13 +21,20 @@ def main() -> None:
     print(f"Duplicates:        {summary.duplicates}")
     print(f"Failed jobs:       {summary.failed_jobs}")
     print(f"Failed sources:    {summary.failed_sources}")
-    print(f"Execution time:    {summary.execution_time_seconds} seconds")
+    print(
+        f"Execution time:    "
+        f"{summary.execution_time_seconds} seconds"
+    )
     print("=" * 50)
 
     if summary.failed_sources or summary.failed_jobs:
-        logger.warning("AI Job Agent completed with some failures.")
+        logger.warning(
+            "AI Job Agent completed with some failures."
+        )
     else:
-        logger.info("AI Job Agent completed successfully.")
+        logger.info(
+            "AI Job Agent completed successfully."
+        )
 
 
 if __name__ == "__main__":

@@ -11,60 +11,90 @@ class JobRepository:
     Handles PostgreSQL operations for collected jobs.
     """
 
+    INSERT_QUERY = """
+        INSERT INTO jobs (
+            source,
+            title,
+            company,
+            location,
+            salary,
+            description,
+            url,
+            employment_type,
+            posted_date,
+            remote,
+            collected_at
+        )
+        VALUES (
+            %(source)s,
+            %(title)s,
+            %(company)s,
+            %(location)s,
+            %(salary)s,
+            %(description)s,
+            %(url)s,
+            %(employment_type)s,
+            %(posted_date)s,
+            %(remote)s,
+            %(collected_at)s
+        )
+        ON CONFLICT (url) DO NOTHING
+        RETURNING id;
+    """
+
     def __init__(self) -> None:
         self.database = DatabaseConnection()
 
-    def save_job(self, job: Job) -> bool:
+    @classmethod
+    def _insert_job_with_cursor(
+        cls,
+        cursor,
+        job: Job,
+    ) -> bool:
         """
-        Save one job.
+        Insert a job using an existing database cursor.
 
         Returns:
             True if inserted.
             False if the URL already exists.
         """
 
-        query = """
-            INSERT INTO jobs (
-                source,
-                title,
-                company,
-                location,
-                salary,
-                description,
-                url,
-                employment_type,
-                posted_date,
-                remote,
-                collected_at
-            )
-            VALUES (
-                %(source)s,
-                %(title)s,
-                %(company)s,
-                %(location)s,
-                %(salary)s,
-                %(description)s,
-                %(url)s,
-                %(employment_type)s,
-                %(posted_date)s,
-                %(remote)s,
-                %(collected_at)s
-            )
-            ON CONFLICT (url) DO NOTHING
-            RETURNING id;
-        """
+        cursor.execute(
+            cls.INSERT_QUERY,
+            job.to_dict(),
+        )
 
-        with self.database.get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(query, job.to_dict())
-                inserted_row = cursor.fetchone()
-                connection.commit()
+        inserted_row = cursor.fetchone()
 
         return inserted_row is not None
 
-    def save_jobs(self, jobs: list[Job]) -> tuple[int, int, int]:
+    def save_job(self, job: Job) -> bool:
         """
-        Save multiple jobs.
+        Save one job using one database connection.
+        """
+
+        job.validate()
+
+        with self.database.get_connection() as connection:
+            with connection.cursor() as cursor:
+                inserted = self._insert_job_with_cursor(
+                    cursor,
+                    job,
+                )
+
+                connection.commit()
+
+        return inserted
+
+    def save_jobs(
+        self,
+        jobs: list[Job],
+    ) -> tuple[int, int, int]:
+        """
+        Save an entire batch using one database connection.
+
+        A savepoint isolates failures so one invalid database row
+        does not cancel all successful rows in the batch.
 
         Returns:
             inserted count,
@@ -76,27 +106,76 @@ class JobRepository:
         duplicates = 0
         failed = 0
 
-        for job in jobs:
-            try:
-                job.validate()
+        if not jobs:
+            return inserted, duplicates, failed
 
-                if self.save_job(job):
-                    inserted += 1
-                else:
-                    duplicates += 1
+        with self.database.get_connection() as connection:
+            with connection.cursor() as cursor:
 
-            except Exception as error:
-                failed += 1
+                for job in jobs:
+                    try:
+                        job.validate()
 
-                logger.error(
-                    "Failed to save job '%s' from %s: %s",
-                    job.title,
-                    job.source,
-                    error,
-                )
+                    except ValueError as error:
+                        failed += 1
+
+                        logger.warning(
+                            "Invalid job '%s' from %s: %s",
+                            job.title,
+                            job.source,
+                            error,
+                        )
+
+                        continue
+
+                    cursor.execute(
+                        "SAVEPOINT current_job_savepoint;"
+                    )
+
+                    try:
+                        was_inserted = (
+                            self._insert_job_with_cursor(
+                                cursor,
+                                job,
+                            )
+                        )
+
+                        cursor.execute(
+                            "RELEASE SAVEPOINT "
+                            "current_job_savepoint;"
+                        )
+
+                        if was_inserted:
+                            inserted += 1
+                        else:
+                            duplicates += 1
+
+                    except Exception as error:
+                        cursor.execute(
+                            "ROLLBACK TO SAVEPOINT "
+                            "current_job_savepoint;"
+                        )
+
+                        cursor.execute(
+                            "RELEASE SAVEPOINT "
+                            "current_job_savepoint;"
+                        )
+
+                        failed += 1
+
+                        logger.exception(
+                            "Failed to save job '%s' "
+                            "from %s: %s",
+                            job.title,
+                            job.source,
+                            error,
+                        )
+
+                connection.commit()
 
         logger.info(
-            "Job save completed: inserted=%s, duplicates=%s, failed=%s",
+            "Job save completed: "
+            "inserted=%s, duplicates=%s, failed=%s",
             inserted,
             duplicates,
             failed,
@@ -105,6 +184,10 @@ class JobRepository:
         return inserted, duplicates, failed
 
     def count_jobs(self) -> int:
+        """
+        Return the number of stored jobs.
+        """
+
         query = "SELECT COUNT(*) FROM jobs;"
 
         with self.database.get_connection() as connection:
