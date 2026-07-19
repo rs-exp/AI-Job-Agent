@@ -12,23 +12,27 @@ def main() -> None:
     summary = collector.run()
 
     print()
-    print("=" * 50)
+    print("=" * 54)
     print("AI JOB AGENT - COLLECTION SUMMARY")
-    print("=" * 50)
-    print(f"Sources run:       {summary.sources_run}")
-    print(f"Jobs received:     {summary.jobs_received}")
-    print(f"Jobs inserted:     {summary.jobs_inserted}")
-    print(f"Jobs updated:      {summary.jobs_updated}")
-    print(f"Relevant jobs:     {summary.relevant_jobs}")
-    print(f"Non-relevant jobs: {summary.non_relevant_jobs}")
-    print(f"Duplicates:        {summary.duplicates}")
-    print(f"Failed jobs:       {summary.failed_jobs}")
-    print(f"Failed sources:    {summary.failed_sources}")
+    print("=" * 54)
+    print(f"Sources run:         {summary.sources_run}")
+    print(f"Jobs received:       {summary.jobs_received}")
+    print(f"Jobs inserted:       {summary.jobs_inserted}")
+    print(f"Jobs updated:        {summary.jobs_updated}")
+    print(f"Duplicates:          {summary.duplicates}")
+    print("-" * 54)
+    print(f"Relevant jobs:       {summary.relevant_jobs}")
+    print(f"Non-relevant jobs:   {summary.non_relevant_jobs}")
+    print(f"Suitable jobs:       {summary.suitable_jobs}")
+    print(f"Not-suitable jobs:   {summary.not_suitable_jobs}")
+    print("-" * 54)
+    print(f"Failed jobs:         {summary.failed_jobs}")
+    print(f"Failed sources:      {summary.failed_sources}")
     print(
-        f"Execution time:    "
+        f"Execution time:      "
         f"{summary.execution_time_seconds} seconds"
     )
-    print("=" * 50)
+    print("=" * 54)
 
     if summary.failed_sources or summary.failed_jobs:
         logger.warning(

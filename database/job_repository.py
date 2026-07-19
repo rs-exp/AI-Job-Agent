@@ -38,6 +38,10 @@ class JobRepository:
             is_relevant,
             relevance_details,
             relevance_evaluated_at,
+            suitability_score,
+            is_suitable,
+            suitability_details,
+            suitability_evaluated_at,
             collected_at
         )
         VALUES (
@@ -56,6 +60,10 @@ class JobRepository:
             %(is_relevant)s,
             %(relevance_details)s,
             %(relevance_evaluated_at)s,
+            %(suitability_score)s,
+            %(is_suitable)s,
+            %(suitability_details)s,
+            %(suitability_evaluated_at)s,
             %(collected_at)s
         )
         ON CONFLICT (url) DO UPDATE
@@ -103,36 +111,78 @@ class JobRepository:
                 jobs.relevance_details
             ),
 
-           relevance_evaluated_at = CASE
-        WHEN (
-            jobs.relevance_score,
-            jobs.is_relevant,
-            jobs.relevance_details
-        )
-        IS DISTINCT FROM (
-            COALESCE(
-                EXCLUDED.relevance_score,
-                jobs.relevance_score
+            relevance_evaluated_at = CASE
+                WHEN (
+                    jobs.relevance_score,
+                    jobs.is_relevant,
+                    jobs.relevance_details
+                )
+                IS DISTINCT FROM (
+                    COALESCE(
+                        EXCLUDED.relevance_score,
+                        jobs.relevance_score
+                    ),
+                    COALESCE(
+                        EXCLUDED.is_relevant,
+                        jobs.is_relevant
+                    ),
+                    COALESCE(
+                        EXCLUDED.relevance_details,
+                        jobs.relevance_details
+                    )
+                )
+                THEN COALESCE(
+                    EXCLUDED.relevance_evaluated_at,
+                    CURRENT_TIMESTAMP
+                )
+                ELSE jobs.relevance_evaluated_at
+            END,
+
+            suitability_score = COALESCE(
+                EXCLUDED.suitability_score,
+                jobs.suitability_score
             ),
-            COALESCE(
-                EXCLUDED.is_relevant,
-                jobs.is_relevant
+
+            is_suitable = COALESCE(
+                EXCLUDED.is_suitable,
+                jobs.is_suitable
             ),
-            COALESCE(
-                EXCLUDED.relevance_details,
-                jobs.relevance_details
-            )
-        )
-        THEN COALESCE(
-            EXCLUDED.relevance_evaluated_at,
-            CURRENT_TIMESTAMP
-        )
-        ELSE jobs.relevance_evaluated_at
-    END,
+
+            suitability_details = COALESCE(
+                EXCLUDED.suitability_details,
+                jobs.suitability_details
+            ),
+
+            suitability_evaluated_at = CASE
+                WHEN (
+                    jobs.suitability_score,
+                    jobs.is_suitable,
+                    jobs.suitability_details
+                )
+                IS DISTINCT FROM (
+                    COALESCE(
+                        EXCLUDED.suitability_score,
+                        jobs.suitability_score
+                    ),
+                    COALESCE(
+                        EXCLUDED.is_suitable,
+                        jobs.is_suitable
+                    ),
+                    COALESCE(
+                        EXCLUDED.suitability_details,
+                        jobs.suitability_details
+                    )
+                )
+                THEN COALESCE(
+                    EXCLUDED.suitability_evaluated_at,
+                    CURRENT_TIMESTAMP
+                )
+                ELSE jobs.suitability_evaluated_at
+            END,
 
             updated_at = CURRENT_TIMESTAMP
 
-               WHERE (
+        WHERE (
             jobs.source,
             jobs.title,
             jobs.company,
@@ -145,7 +195,10 @@ class JobRepository:
             jobs.remote,
             jobs.relevance_score,
             jobs.is_relevant,
-            jobs.relevance_details
+            jobs.relevance_details,
+            jobs.suitability_score,
+            jobs.is_suitable,
+            jobs.suitability_details
         )
         IS DISTINCT FROM (
             EXCLUDED.source,
@@ -153,8 +206,14 @@ class JobRepository:
             EXCLUDED.company,
             EXCLUDED.location,
             EXCLUDED.fingerprint,
-            COALESCE(EXCLUDED.salary, jobs.salary),
-            COALESCE(EXCLUDED.description, jobs.description),
+            COALESCE(
+                EXCLUDED.salary,
+                jobs.salary
+            ),
+            COALESCE(
+                EXCLUDED.description,
+                jobs.description
+            ),
             COALESCE(
                 EXCLUDED.employment_type,
                 jobs.employment_type
@@ -175,6 +234,18 @@ class JobRepository:
             COALESCE(
                 EXCLUDED.relevance_details,
                 jobs.relevance_details
+            ),
+            COALESCE(
+                EXCLUDED.suitability_score,
+                jobs.suitability_score
+            ),
+            COALESCE(
+                EXCLUDED.is_suitable,
+                jobs.is_suitable
+            ),
+            COALESCE(
+                EXCLUDED.suitability_details,
+                jobs.suitability_details
             )
         )
 
@@ -195,6 +266,11 @@ class JobRepository:
         if job.relevance_details is not None:
             values["relevance_details"] = Jsonb(
                 job.relevance_details
+            )
+
+        if job.suitability_details is not None:
+            values["suitability_details"] = Jsonb(
+                job.suitability_details
             )
 
         return values
@@ -268,7 +344,6 @@ class JobRepository:
 
         with self.database.get_connection() as connection:
             with connection.cursor() as cursor:
-
                 for job in jobs:
                     try:
                         job.validate()

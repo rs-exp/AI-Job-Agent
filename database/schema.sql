@@ -64,6 +64,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     is_relevant BOOLEAN,
     relevance_details JSONB,
     relevance_evaluated_at TIMESTAMPTZ,
+    suitability_score INTEGER,
+    is_suitable BOOLEAN,
+    suitability_details JSONB,
+    suitability_evaluated_at TIMESTAMPTZ,
 
     title VARCHAR(255) NOT NULL,
     company VARCHAR(255) NOT NULL,
@@ -151,3 +155,9 @@ ON jobs(relevance_score DESC);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_is_relevant
 ON jobs(is_relevant);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_suitability_score
+ON jobs(suitability_score DESC);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_is_suitable
+ON jobs(is_suitable);

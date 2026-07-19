@@ -30,6 +30,11 @@ class Job:
     relevance_details: Optional[dict[str, Any]] = None
     relevance_evaluated_at: Optional[datetime] = None
 
+    suitability_score: Optional[int] = None
+    is_suitable: Optional[bool] = None
+    suitability_details: Optional[dict[str, Any]] = None
+    suitability_evaluated_at: Optional[datetime] = None
+
     collected_at: datetime = field(
         default_factory=lambda: datetime.now(UTC)
     )
@@ -84,5 +89,11 @@ class Job:
             "relevance_details": self.relevance_details,
             "relevance_evaluated_at": (
                 self.relevance_evaluated_at
+            ),
+            "suitability_score": self.suitability_score,
+            "is_suitable": self.is_suitable,
+            "suitability_details": self.suitability_details,
+            "suitability_evaluated_at": (
+                self.suitability_evaluated_at
             ),
         }
