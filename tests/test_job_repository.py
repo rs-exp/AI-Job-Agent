@@ -1,23 +1,65 @@
 from database.job_repository import JobRepository
-from scrapers.remotive_scraper import RemotiveScraper
+from models.job import Job
 
 
-def main() -> None:
-    scraper = RemotiveScraper()
-    repository = JobRepository()
+class FakeCursor:
+    def __init__(self, fetch_result) -> None:
+        self.fetch_result = fetch_result
+        self.executed_query = None
+        self.executed_values = None
 
-    jobs = scraper.start()
+    def execute(self, query, values) -> None:
+        self.executed_query = query
+        self.executed_values = values
 
-    inserted, duplicates, failed = repository.save_jobs(jobs)
-    total_in_database = repository.count_jobs()
-
-    print("\nDatabase save completed")
-    print(f"Received:          {len(jobs)}")
-    print(f"Inserted:          {inserted}")
-    print(f"Duplicates:        {duplicates}")
-    print(f"Failed:            {failed}")
-    print(f"Total in database: {total_in_database}")
+    def fetchone(self):
+        return self.fetch_result
 
 
-if __name__ == "__main__":
-    main()
+def create_job() -> Job:
+    return Job(
+        title="DevOps Engineer",
+        company="Example Company",
+        location="Pune",
+        url="https://example.com/jobs/devops-engineer",
+        source="TestSource",
+        employment_type="Full-time",
+        remote=False,
+    )
+
+
+def test_upsert_returns_inserted() -> None:
+    cursor = FakeCursor((True,))
+    job = create_job()
+
+    result = JobRepository._upsert_job_with_cursor(
+        cursor,
+        job,
+    )
+
+    assert result == "inserted"
+    assert cursor.executed_values == job.to_dict()
+
+
+def test_upsert_returns_updated() -> None:
+    cursor = FakeCursor((False,))
+    job = create_job()
+
+    result = JobRepository._upsert_job_with_cursor(
+        cursor,
+        job,
+    )
+
+    assert result == "updated"
+
+
+def test_upsert_returns_duplicate() -> None:
+    cursor = FakeCursor(None)
+    job = create_job()
+
+    result = JobRepository._upsert_job_with_cursor(
+        cursor,
+        job,
+    )
+
+    assert result == "duplicate"
