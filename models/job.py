@@ -23,6 +23,7 @@ class Job:
     employment_type: Optional[str] = None
     posted_date: Optional[datetime] = None
     remote: bool = False
+    fingerprint: Optional[str] = None
 
     collected_at: datetime = field(
     default_factory=lambda: datetime.now(UTC)
@@ -73,4 +74,5 @@ class Job:
             "posted_date": self.posted_date,
             "remote": self.remote,
             "collected_at": self.collected_at,
+            "fingerprint": self.fingerprint,
         }

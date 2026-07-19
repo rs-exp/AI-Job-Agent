@@ -23,8 +23,10 @@ class BaseScraper(ABC):
 
     def start(self) -> list[Job]:
         """
-        Run the scraper and propagate source failures
-        to the collector.
+        Run the scraper.
+
+        Source failures propagate to JobCollector,
+        which records and logs them.
         """
 
         self.logger.info(
@@ -32,15 +34,7 @@ class BaseScraper(ABC):
             self.source_name,
         )
 
-        try:
-            jobs = self.fetch_jobs()
-
-        except Exception:
-            self.logger.exception(
-                "%s scraper failed.",
-                self.source_name,
-            )
-            raise
+        jobs = self.fetch_jobs()
 
         self.logger.info(
             "%s returned %s jobs.",

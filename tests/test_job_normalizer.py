@@ -90,6 +90,49 @@ def test_normalize_preserves_explicit_remote_value(
 
     assert normalized_job.remote is True
 
+def test_normalize_generates_sha256_fingerprint(
+    normalizer: JobNormalizer,
+) -> None:
+    job = Job(
+        title="DevOps Engineer",
+        company="Example Company",
+        location="Pune",
+        url="https://example.com/jobs/6",
+        source="TestSource",
+    )
+
+    normalized_job = normalizer.normalize(job)
+
+    assert normalized_job.fingerprint is not None
+    assert len(normalized_job.fingerprint) == 64
+
+
+def test_equivalent_jobs_generate_same_fingerprint(
+    normalizer: JobNormalizer,
+) -> None:
+    first_job = Job(
+        title="  DevOps   Engineer ",
+        company="Example Company",
+        location=" Pune ",
+        url="https://source-one.example/jobs/1",
+        source="SourceOne",
+    )
+
+    second_job = Job(
+        title="devops engineer",
+        company="example company",
+        location="pune",
+        url="https://source-two.example/jobs/99",
+        source="SourceTwo",
+    )
+
+    first_normalized = normalizer.normalize(first_job)
+    second_normalized = normalizer.normalize(second_job)
+
+    assert (
+        first_normalized.fingerprint
+        == second_normalized.fingerprint
+    )
 
 def test_normalize_rejects_missing_required_field(
     normalizer: JobNormalizer,

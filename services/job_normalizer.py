@@ -1,3 +1,4 @@
+import hashlib
 import html
 import re
 from dataclasses import replace
@@ -60,6 +61,12 @@ class JobNormalizer:
         if not location:
             location = "Not specified"
 
+        fingerprint = self._generate_fingerprint(
+            company=company,
+            title=title,
+            location=location,
+        )
+
         remote = self._infer_remote(
             current_value=job.remote,
             title=title,
@@ -75,6 +82,7 @@ class JobNormalizer:
             description=description,
             employment_type=employment_type,
             remote=remote,
+            fingerprint=fingerprint,
             url=job.url.strip(),
             source=job.source.strip(),
             salary=self._clean_optional_text(job.salary),
@@ -148,6 +156,29 @@ class JobNormalizer:
             lookup_value,
             cleaned_value,
         )
+
+    @staticmethod
+    def _generate_fingerprint(
+        company: str,
+        title: str,
+        location: str,
+    ) -> str:
+        """
+        Generate a deterministic SHA-256 fingerprint for
+        cross-source duplicate detection.
+        """
+
+        fingerprint_source = "|".join(
+            [
+                company.casefold(),
+                title.casefold(),
+                location.casefold(),
+            ]
+        )
+
+        return hashlib.sha256(
+            fingerprint_source.encode("utf-8")
+        ).hexdigest()
 
     @staticmethod
     def _infer_remote(

@@ -28,6 +28,7 @@ class JobRepository:
             salary,
             description,
             url,
+            fingerprint,
             employment_type,
             posted_date,
             remote,
@@ -41,6 +42,7 @@ class JobRepository:
             %(salary)s,
             %(description)s,
             %(url)s,
+            %(fingerprint)s,
             %(employment_type)s,
             %(posted_date)s,
             %(remote)s,
@@ -52,6 +54,7 @@ class JobRepository:
             title = EXCLUDED.title,
             company = EXCLUDED.company,
             location = EXCLUDED.location,
+            fingerprint = EXCLUDED.fingerprint,
 
             salary = COALESCE(
                 EXCLUDED.salary,
@@ -81,6 +84,7 @@ class JobRepository:
             jobs.title,
             jobs.company,
             jobs.location,
+            jobs.fingerprint,
             jobs.salary,
             jobs.description,
             jobs.employment_type,
@@ -92,6 +96,7 @@ class JobRepository:
             EXCLUDED.title,
             EXCLUDED.company,
             EXCLUDED.location,
+            EXCLUDED.fingerprint,
             COALESCE(EXCLUDED.salary, jobs.salary),
             COALESCE(EXCLUDED.description, jobs.description),
             COALESCE(

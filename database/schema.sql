@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     id BIGSERIAL PRIMARY KEY,
 
     source VARCHAR(100) NOT NULL,
+    fingerprint VARCHAR(64),
 
     title VARCHAR(255) NOT NULL,
     company VARCHAR(255) NOT NULL,
@@ -131,6 +132,9 @@ ON jobs(status);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_remote
 ON jobs(remote);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_fingerprint
+ON jobs(fingerprint);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_posted_date
 ON jobs(posted_date DESC);
