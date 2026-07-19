@@ -1,3 +1,5 @@
+from typing import Literal
+
 from database.connection import DatabaseConnection
 from models.job import Job
 from utils.logger import get_logger
@@ -5,13 +7,19 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+SaveResult = Literal[
+    "inserted",
+    "updated",
+    "duplicate",
+]
+
 
 class JobRepository:
     """
     Handles PostgreSQL operations for collected jobs.
     """
 
-    INSERT_QUERY = """
+    UPSERT_QUERY = """
         INSERT INTO jobs (
             source,
             title,
@@ -38,37 +46,96 @@ class JobRepository:
             %(remote)s,
             %(collected_at)s
         )
-        ON CONFLICT (url) DO NOTHING
-        RETURNING id;
+        ON CONFLICT (url) DO UPDATE
+        SET
+            source = EXCLUDED.source,
+            title = EXCLUDED.title,
+            company = EXCLUDED.company,
+            location = EXCLUDED.location,
+
+            salary = COALESCE(
+                EXCLUDED.salary,
+                jobs.salary
+            ),
+
+            description = COALESCE(
+                EXCLUDED.description,
+                jobs.description
+            ),
+
+            employment_type = COALESCE(
+                EXCLUDED.employment_type,
+                jobs.employment_type
+            ),
+
+            posted_date = COALESCE(
+                EXCLUDED.posted_date,
+                jobs.posted_date
+            ),
+
+            remote = EXCLUDED.remote,
+            updated_at = CURRENT_TIMESTAMP
+
+        WHERE (
+            jobs.source,
+            jobs.title,
+            jobs.company,
+            jobs.location,
+            jobs.salary,
+            jobs.description,
+            jobs.employment_type,
+            jobs.posted_date,
+            jobs.remote
+        )
+        IS DISTINCT FROM (
+            EXCLUDED.source,
+            EXCLUDED.title,
+            EXCLUDED.company,
+            EXCLUDED.location,
+            COALESCE(EXCLUDED.salary, jobs.salary),
+            COALESCE(EXCLUDED.description, jobs.description),
+            COALESCE(
+                EXCLUDED.employment_type,
+                jobs.employment_type
+            ),
+            COALESCE(EXCLUDED.posted_date, jobs.posted_date),
+            EXCLUDED.remote
+        )
+
+        RETURNING (xmax = 0) AS inserted;
     """
 
     def __init__(self) -> None:
         self.database = DatabaseConnection()
 
     @classmethod
-    def _insert_job_with_cursor(
+    def _upsert_job_with_cursor(
         cls,
         cursor,
         job: Job,
-    ) -> bool:
+    ) -> SaveResult:
         """
-        Insert a job using an existing database cursor.
-
-        Returns:
-            True if inserted.
-            False if the URL already exists.
+        Insert, update, or identify an unchanged duplicate.
         """
 
         cursor.execute(
-            cls.INSERT_QUERY,
+            cls.UPSERT_QUERY,
             job.to_dict(),
         )
 
-        inserted_row = cursor.fetchone()
+        result = cursor.fetchone()
 
-        return inserted_row is not None
+        if result is None:
+            return "duplicate"
 
-    def save_job(self, job: Job) -> bool:
+        was_inserted = result[0]
+
+        if was_inserted:
+            return "inserted"
+
+        return "updated"
+
+    def save_job(self, job: Job) -> SaveResult:
         """
         Save one job using one database connection.
         """
@@ -77,37 +144,36 @@ class JobRepository:
 
         with self.database.get_connection() as connection:
             with connection.cursor() as cursor:
-                inserted = self._insert_job_with_cursor(
+                result = self._upsert_job_with_cursor(
                     cursor,
                     job,
                 )
 
                 connection.commit()
 
-        return inserted
+        return result
 
     def save_jobs(
         self,
         jobs: list[Job],
-    ) -> tuple[int, int, int]:
+    ) -> tuple[int, int, int, int]:
         """
-        Save an entire batch using one database connection.
-
-        A savepoint isolates failures so one invalid database row
-        does not cancel all successful rows in the batch.
+        Save a batch using one database connection.
 
         Returns:
             inserted count,
-            duplicate count,
+            updated count,
+            unchanged duplicate count,
             failed count
         """
 
         inserted = 0
+        updated = 0
         duplicates = 0
         failed = 0
 
         if not jobs:
-            return inserted, duplicates, failed
+            return inserted, updated, duplicates, failed
 
         with self.database.get_connection() as connection:
             with connection.cursor() as cursor:
@@ -133,11 +199,9 @@ class JobRepository:
                     )
 
                     try:
-                        was_inserted = (
-                            self._insert_job_with_cursor(
-                                cursor,
-                                job,
-                            )
+                        result = self._upsert_job_with_cursor(
+                            cursor,
+                            job,
                         )
 
                         cursor.execute(
@@ -145,8 +209,12 @@ class JobRepository:
                             "current_job_savepoint;"
                         )
 
-                        if was_inserted:
+                        if result == "inserted":
                             inserted += 1
+
+                        elif result == "updated":
+                            updated += 1
+
                         else:
                             duplicates += 1
 
@@ -174,14 +242,15 @@ class JobRepository:
                 connection.commit()
 
         logger.info(
-            "Job save completed: "
-            "inserted=%s, duplicates=%s, failed=%s",
+            "Job save completed: inserted=%s, "
+            "updated=%s, duplicates=%s, failed=%s",
             inserted,
+            updated,
             duplicates,
             failed,
         )
 
-        return inserted, duplicates, failed
+        return inserted, updated, duplicates, failed
 
     def count_jobs(self) -> int:
         """

@@ -22,6 +22,7 @@ class CollectionSummary:
     failed_jobs: int = 0
     failed_sources: int = 0
     execution_time_seconds: float = 0.0
+    jobs_updated: int = 0
 
 
 class JobCollector:
@@ -71,13 +72,14 @@ class JobCollector:
                             error,
                         )
 
-                inserted, duplicates, failed = (
+                inserted, updated, duplicates, failed = (
                     self.repository.save_jobs(
                         normalized_jobs
                     )
                 )
 
                 summary.jobs_inserted += inserted
+                summary.jobs_updated += updated
                 summary.duplicates += duplicates
                 summary.failed_jobs += failed
 
@@ -106,11 +108,12 @@ class JobCollector:
 
         logger.info(
             "Collection completed: sources=%s, received=%s, "
-            "inserted=%s, duplicates=%s, failed_jobs=%s, "
+            "inserted=%s, updated=%s, duplicates=%s, failed_jobs=%s, "
             "failed_sources=%s, duration=%ss",
             summary.sources_run,
             summary.jobs_received,
             summary.jobs_inserted,
+            summary.jobs_updated,
             summary.duplicates,
             summary.failed_jobs,
             summary.failed_sources,

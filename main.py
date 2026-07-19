@@ -18,6 +18,7 @@ def main() -> None:
     print(f"Sources run:       {summary.sources_run}")
     print(f"Jobs received:     {summary.jobs_received}")
     print(f"Jobs inserted:     {summary.jobs_inserted}")
+    print(f"Jobs updated:      {summary.jobs_updated}")
     print(f"Duplicates:        {summary.duplicates}")
     print(f"Failed jobs:       {summary.failed_jobs}")
     print(f"Failed sources:    {summary.failed_sources}")
