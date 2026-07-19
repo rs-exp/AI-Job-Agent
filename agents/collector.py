@@ -1,12 +1,18 @@
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from time import perf_counter
 
 from database.job_repository import JobRepository
+from models.job import Job
 from scrapers.arbeitnow_scraper import ArbeitNowScraper
 from scrapers.base_scraper import BaseScraper
 from scrapers.greenhouse_scraper import GreenhouseScraper
 from scrapers.remotive_scraper import RemotiveScraper
 from services.job_normalizer import JobNormalizer
+from services.job_relevance_filter import (
+    JobRelevanceFilter,
+    RelevanceResult,
+)
 from utils.logger import get_logger
 
 
@@ -18,22 +24,25 @@ class CollectionSummary:
     sources_run: int = 0
     jobs_received: int = 0
     jobs_inserted: int = 0
+    jobs_updated: int = 0
     duplicates: int = 0
     failed_jobs: int = 0
     failed_sources: int = 0
+    relevant_jobs: int = 0
+    non_relevant_jobs: int = 0
     execution_time_seconds: float = 0.0
-    jobs_updated: int = 0
 
 
 class JobCollector:
     """
-    Runs configured scrapers, normalizes jobs,
+    Runs configured scrapers, normalizes and evaluates jobs,
     and stores them in PostgreSQL.
     """
 
     def __init__(self) -> None:
         self.repository = JobRepository()
         self.normalizer = JobNormalizer()
+        self.relevance_filter = JobRelevanceFilter()
 
         self.scrapers: list[BaseScraper] = [
             RemotiveScraper(),
@@ -54,18 +63,37 @@ class JobCollector:
                 jobs = scraper.start()
                 summary.jobs_received += len(jobs)
 
-                normalized_jobs = []
+                processed_jobs: list[Job] = []
 
                 for job in jobs:
                     try:
-                        normalized_job = self.normalizer.normalize(job)
-                        normalized_jobs.append(normalized_job)
+                        normalized_job = self.normalizer.normalize(
+                            job
+                        )
+
+                        relevance_result = (
+                            self.relevance_filter.evaluate(
+                                normalized_job
+                            )
+                        )
+
+                        self._apply_relevance_result(
+                            job=normalized_job,
+                            result=relevance_result,
+                        )
+
+                        if relevance_result.is_relevant:
+                            summary.relevant_jobs += 1
+                        else:
+                            summary.non_relevant_jobs += 1
+
+                        processed_jobs.append(normalized_job)
 
                     except Exception as error:
                         summary.failed_jobs += 1
 
                         logger.exception(
-                            "Failed to normalize job '%s' "
+                            "Failed to process job '%s' "
                             "from %s: %s",
                             getattr(job, "title", "Unknown"),
                             scraper.source_name,
@@ -74,7 +102,7 @@ class JobCollector:
 
                 inserted, updated, duplicates, failed = (
                     self.repository.save_jobs(
-                        normalized_jobs
+                        processed_jobs
                     )
                 )
 
@@ -84,12 +112,12 @@ class JobCollector:
                 summary.failed_jobs += failed
 
                 logger.info(
-                    "%s normalization completed: "
-                    "received=%s, normalized=%s, failed=%s",
+                    "%s processing completed: "
+                    "received=%s, processed=%s, failed=%s",
                     scraper.source_name,
                     len(jobs),
-                    len(normalized_jobs),
-                    len(jobs) - len(normalized_jobs),
+                    len(processed_jobs),
+                    len(jobs) - len(processed_jobs),
                 )
 
             except Exception as error:
@@ -108,16 +136,52 @@ class JobCollector:
 
         logger.info(
             "Collection completed: sources=%s, received=%s, "
-            "inserted=%s, updated=%s, duplicates=%s, failed_jobs=%s, "
+            "inserted=%s, updated=%s, duplicates=%s, "
+            "relevant=%s, non_relevant=%s, failed_jobs=%s, "
             "failed_sources=%s, duration=%ss",
             summary.sources_run,
             summary.jobs_received,
             summary.jobs_inserted,
             summary.jobs_updated,
             summary.duplicates,
+            summary.relevant_jobs,
+            summary.non_relevant_jobs,
             summary.failed_jobs,
             summary.failed_sources,
             summary.execution_time_seconds,
         )
 
         return summary
+
+    @staticmethod
+    def _apply_relevance_result(
+        job: Job,
+        result: RelevanceResult,
+    ) -> None:
+        """
+        Store the explainable relevance result on the job model.
+        """
+
+        job.relevance_score = result.score
+        job.is_relevant = result.is_relevant
+        job.relevance_evaluated_at = datetime.now(UTC)
+
+        job.relevance_details = {
+            "matched_role_groups": list(
+                result.matched_role_groups
+            ),
+            "matched_technology_groups": list(
+                result.matched_technology_groups
+            ),
+            "matched_keywords": list(
+                result.matched_keywords
+            ),
+            "negative_title_keywords": list(
+                result.negative_title_keywords
+            ),
+            "preferred_location_match": (
+                result.preferred_location_match
+            ),
+            "remote_match": result.remote_match,
+            "reasons": list(result.reasons),
+        }

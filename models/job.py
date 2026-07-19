@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -25,9 +25,14 @@ class Job:
     remote: bool = False
     fingerprint: Optional[str] = None
 
+    relevance_score: Optional[int] = None
+    is_relevant: Optional[bool] = None
+    relevance_details: Optional[dict[str, Any]] = None
+    relevance_evaluated_at: Optional[datetime] = None
+
     collected_at: datetime = field(
-    default_factory=lambda: datetime.now(UTC)
-)
+        default_factory=lambda: datetime.now(UTC)
+    )
 
     def validate(self) -> None:
         """
@@ -52,14 +57,13 @@ class Job:
 
         if missing_fields:
             raise ValueError(
-                f"Missing required job fields: {', '.join(missing_fields)}"
+                f"Missing required job fields: "
+                f"{', '.join(missing_fields)}"
             )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """
         Convert the Job object into a dictionary.
-
-        This will later help us insert jobs into PostgreSQL.
         """
 
         return {
@@ -75,4 +79,10 @@ class Job:
             "remote": self.remote,
             "collected_at": self.collected_at,
             "fingerprint": self.fingerprint,
+            "relevance_score": self.relevance_score,
+            "is_relevant": self.is_relevant,
+            "relevance_details": self.relevance_details,
+            "relevance_evaluated_at": (
+                self.relevance_evaluated_at
+            ),
         }

@@ -1,5 +1,7 @@
 from typing import Literal
 
+from psycopg.types.json import Jsonb
+
 from database.connection import DatabaseConnection
 from models.job import Job
 from utils.logger import get_logger
@@ -32,6 +34,10 @@ class JobRepository:
             employment_type,
             posted_date,
             remote,
+            relevance_score,
+            is_relevant,
+            relevance_details,
+            relevance_evaluated_at,
             collected_at
         )
         VALUES (
@@ -46,6 +52,10 @@ class JobRepository:
             %(employment_type)s,
             %(posted_date)s,
             %(remote)s,
+            %(relevance_score)s,
+            %(is_relevant)s,
+            %(relevance_details)s,
+            %(relevance_evaluated_at)s,
             %(collected_at)s
         )
         ON CONFLICT (url) DO UPDATE
@@ -77,9 +87,52 @@ class JobRepository:
             ),
 
             remote = EXCLUDED.remote,
+
+            relevance_score = COALESCE(
+                EXCLUDED.relevance_score,
+                jobs.relevance_score
+            ),
+
+            is_relevant = COALESCE(
+                EXCLUDED.is_relevant,
+                jobs.is_relevant
+            ),
+
+            relevance_details = COALESCE(
+                EXCLUDED.relevance_details,
+                jobs.relevance_details
+            ),
+
+           relevance_evaluated_at = CASE
+        WHEN (
+            jobs.relevance_score,
+            jobs.is_relevant,
+            jobs.relevance_details
+        )
+        IS DISTINCT FROM (
+            COALESCE(
+                EXCLUDED.relevance_score,
+                jobs.relevance_score
+            ),
+            COALESCE(
+                EXCLUDED.is_relevant,
+                jobs.is_relevant
+            ),
+            COALESCE(
+                EXCLUDED.relevance_details,
+                jobs.relevance_details
+            )
+        )
+        THEN COALESCE(
+            EXCLUDED.relevance_evaluated_at,
+            CURRENT_TIMESTAMP
+        )
+        ELSE jobs.relevance_evaluated_at
+    END,
+
             updated_at = CURRENT_TIMESTAMP
 
-        WHERE (
+               WHERE (
             jobs.source,
             jobs.title,
             jobs.company,
@@ -89,7 +142,10 @@ class JobRepository:
             jobs.description,
             jobs.employment_type,
             jobs.posted_date,
-            jobs.remote
+            jobs.remote,
+            jobs.relevance_score,
+            jobs.is_relevant,
+            jobs.relevance_details
         )
         IS DISTINCT FROM (
             EXCLUDED.source,
@@ -103,8 +159,23 @@ class JobRepository:
                 EXCLUDED.employment_type,
                 jobs.employment_type
             ),
-            COALESCE(EXCLUDED.posted_date, jobs.posted_date),
-            EXCLUDED.remote
+            COALESCE(
+                EXCLUDED.posted_date,
+                jobs.posted_date
+            ),
+            EXCLUDED.remote,
+            COALESCE(
+                EXCLUDED.relevance_score,
+                jobs.relevance_score
+            ),
+            COALESCE(
+                EXCLUDED.is_relevant,
+                jobs.is_relevant
+            ),
+            COALESCE(
+                EXCLUDED.relevance_details,
+                jobs.relevance_details
+            )
         )
 
         RETURNING (xmax = 0) AS inserted;
@@ -112,6 +183,21 @@ class JobRepository:
 
     def __init__(self) -> None:
         self.database = DatabaseConnection()
+
+    @staticmethod
+    def _prepare_job_values(job: Job) -> dict:
+        """
+        Prepare database-compatible values for one job.
+        """
+
+        values = job.to_dict()
+
+        if job.relevance_details is not None:
+            values["relevance_details"] = Jsonb(
+                job.relevance_details
+            )
+
+        return values
 
     @classmethod
     def _upsert_job_with_cursor(
@@ -125,7 +211,7 @@ class JobRepository:
 
         cursor.execute(
             cls.UPSERT_QUERY,
-            job.to_dict(),
+            cls._prepare_job_values(job),
         )
 
         result = cursor.fetchone()

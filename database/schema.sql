@@ -60,6 +60,10 @@ CREATE TABLE IF NOT EXISTS jobs (
 
     source VARCHAR(100) NOT NULL,
     fingerprint VARCHAR(64),
+    relevance_score INTEGER,
+    is_relevant BOOLEAN,
+    relevance_details JSONB,
+    relevance_evaluated_at TIMESTAMPTZ,
 
     title VARCHAR(255) NOT NULL,
     company VARCHAR(255) NOT NULL,
@@ -141,3 +145,9 @@ ON jobs(posted_date DESC);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_collected_at
 ON jobs(collected_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_relevance_score
+ON jobs(relevance_score DESC);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_is_relevant
+ON jobs(is_relevant);
