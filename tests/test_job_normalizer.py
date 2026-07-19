@@ -134,19 +134,31 @@ def test_equivalent_jobs_generate_same_fingerprint(
         == second_normalized.fingerprint
     )
 
-def test_normalize_rejects_missing_required_field(
-    normalizer: JobNormalizer,
-) -> None:
+def test_normalize_detects_remote_location_prefix() -> None:
     job = Job(
-        title="   ",
+        title="Site Reliability Engineer",
+        company="Example Company",
+        location="Remote - United Kingdom",
+        url="https://example.com/jobs/sre-remote",
+        source="TestSource",
+        remote=False,
+    )
+
+    normalized_job = JobNormalizer().normalize(job)
+
+    assert normalized_job.remote is True
+
+def test_normalize_rejects_missing_required_field() -> None:
+    job = Job(
+        title="",
         company="Example Company",
         location="Pune",
-        url="https://example.com/jobs/5",
-        source="Greenhouse",
+        url="https://example.com/jobs/invalid",
+        source="TestSource",
     )
 
     with pytest.raises(
         ValueError,
         match="Missing required job fields: title",
     ):
-        normalizer.normalize(job)
+        JobNormalizer().normalize(job)

@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 
 from models.job import Job
 from services.job_relevance_filter import (
@@ -99,21 +99,30 @@ def test_cloud_support_job_is_relevant(
     assert result.preferred_location_match is True
 
 
-def test_technology_keywords_alone_do_not_always_qualify(
+def test_technology_keywords_alone_do_not_qualify(
     relevance_filter: JobRelevanceFilter,
 ) -> None:
     job = create_job(
-        title="Business Analyst",
+        title="Backend Engineer",
         location="Delhi",
-        description="Uses Azure and AWS reporting tools.",
+        description=(
+            "Work with Azure, Terraform, Docker, "
+            "Kubernetes, Prometheus, Grafana, and Linux."
+        ),
     )
 
     result = relevance_filter.evaluate(job)
 
+    assert result.score >= 8
     assert result.is_relevant is False
-    assert result.score < 8
     assert result.matched_role_groups == ()
     assert "cloud" in result.matched_technology_groups
+    assert "devops_tools" in result.matched_technology_groups
+    assert "containers" in result.matched_technology_groups
+    assert any(
+        "no target role group matched" in reason
+        for reason in result.reasons
+    )
 
 
 def test_negative_title_is_rejected(
@@ -205,3 +214,417 @@ def test_filter_jobs_returns_only_relevant_jobs_sorted(
         scores,
         reverse=True,
     )
+
+
+def test_machine_learning_systems_engineer_is_not_target_role(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Senior Machine Learning Systems Engineer",
+        location="Remote - United States",
+        description=(
+            "Build machine learning ranking and retrieval systems."
+        ),
+        remote=True,
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is False
+    assert (
+        "platform_engineering"
+        not in result.matched_role_groups
+    )
+
+
+def test_generic_technical_support_with_cloud_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Technical Support Engineer",
+        location="Pune",
+        description=(
+            "Troubleshoot Azure virtual machines, "
+            "networking, and customer incidents."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "cloud_support" in result.matched_role_groups
+    assert "cloud" in result.matched_technology_groups
+
+
+def test_generic_technical_support_without_cloud_is_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Technical Support Engineer",
+        location="Mumbai",
+        description=(
+            "Troubleshoot desktop applications, "
+            "printers, and user devices."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is False
+    assert "cloud_support" not in result.matched_role_groups
+
+
+def test_generic_reliability_engineer_with_evidence_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Reliability Engineer",
+        location="Remote",
+        description=(
+            "Manage Prometheus, Grafana, Linux, DNS, "
+            "and incident management."
+        ),
+        remote=True,
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "sre" in result.matched_role_groups
+    assert "monitoring" in result.matched_technology_groups
+    assert "systems" in result.matched_technology_groups
+
+
+def test_generic_reliability_engineer_without_monitoring_is_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Reliability Engineer",
+        location="Delhi",
+        description=(
+            "Maintain AWS infrastructure using "
+            "Terraform and Kubernetes."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is False
+    assert "sre" not in result.matched_role_groups
+
+
+def test_generic_infrastructure_engineer_with_evidence_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Infrastructure Engineer",
+        location="Pune",
+        description=(
+            "Operate AWS virtual machines, Linux, "
+            "DNS, load balancers, and firewalls."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "cloud_operations" in result.matched_role_groups
+    assert "cloud" in result.matched_technology_groups
+    assert "systems" in result.matched_technology_groups
+
+
+def test_generic_infrastructure_engineer_without_enough_evidence_is_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Infrastructure Engineer",
+        location="Delhi",
+        description=(
+            "Maintain Linux, Windows Server, DNS, "
+            "and firewall configurations."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is False
+    assert "cloud_operations" not in result.matched_role_groups
+
+
+def test_generic_platform_engineer_with_evidence_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Platform Engineer",
+        location="Mumbai",
+        description=(
+            "Build and operate Kubernetes and Docker "
+            "platform services."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "platform_engineering" in result.matched_role_groups
+    assert "containers" in result.matched_technology_groups
+
+
+def test_generic_platform_engineer_without_evidence_is_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Platform Engineer",
+        location="Delhi",
+        description=(
+            "Coordinate internal business platform "
+            "documentation and planning."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is False
+    assert (
+        "platform_engineering"
+        not in result.matched_role_groups
+    )
+
+
+def test_generic_application_support_with_evidence_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Application Support Engineer",
+        location="Pune",
+        description=(
+            "Monitor applications using Grafana and "
+            "handle production incident management."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "production_support" in result.matched_role_groups
+    assert "monitoring" in result.matched_technology_groups
+
+
+def test_excluded_generic_titles_are_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    titles = (
+        "Technical Support Engineer Intern",
+        "Audiovisual Infrastructure Engineer",
+    )
+
+    for title in titles:
+        job = create_job(
+            title=title,
+            location="Pune",
+            description=(
+                "Work with Azure, AWS, Terraform, "
+                "Kubernetes, monitoring, and Linux."
+            ),
+        )
+
+        result = relevance_filter.evaluate(job)
+
+        assert result.is_relevant is False
+        assert result.negative_title_keywords
+
+def test_generic_technical_support_with_cloud_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Technical Support Engineer",
+        location="Pune",
+        description=(
+            "Troubleshoot Azure virtual machines, "
+            "networking, and customer incidents."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "cloud_support" in result.matched_role_groups
+    assert "cloud" in result.matched_technology_groups
+
+
+def test_generic_technical_support_without_cloud_is_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Technical Support Engineer",
+        location="Mumbai",
+        description=(
+            "Troubleshoot desktop applications, "
+            "printers, and user devices."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is False
+    assert "cloud_support" not in result.matched_role_groups
+
+
+def test_generic_reliability_engineer_with_evidence_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Reliability Engineer",
+        location="Remote",
+        description=(
+            "Manage Prometheus, Grafana, Linux, DNS, "
+            "and incident management."
+        ),
+        remote=True,
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "sre" in result.matched_role_groups
+    assert "monitoring" in result.matched_technology_groups
+    assert "systems" in result.matched_technology_groups
+
+
+def test_generic_reliability_engineer_without_monitoring_is_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Reliability Engineer",
+        location="Delhi",
+        description=(
+            "Maintain AWS infrastructure using "
+            "Terraform and Kubernetes."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is False
+    assert "sre" not in result.matched_role_groups
+
+
+def test_generic_infrastructure_engineer_with_evidence_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Infrastructure Engineer",
+        location="Pune",
+        description=(
+            "Operate AWS virtual machines, Linux, "
+            "DNS, load balancers, and firewalls."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "cloud_operations" in result.matched_role_groups
+    assert "cloud" in result.matched_technology_groups
+    assert "systems" in result.matched_technology_groups
+
+
+def test_generic_infrastructure_engineer_without_enough_evidence_is_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Infrastructure Engineer",
+        location="Delhi",
+        description=(
+            "Maintain Linux, Windows Server, DNS, "
+            "and firewall configurations."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is False
+    assert "cloud_operations" not in result.matched_role_groups
+
+
+def test_generic_platform_engineer_with_evidence_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Platform Engineer",
+        location="Mumbai",
+        description=(
+            "Build and operate Kubernetes and Docker "
+            "platform services."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "platform_engineering" in result.matched_role_groups
+    assert "containers" in result.matched_technology_groups
+
+
+def test_generic_platform_engineer_without_evidence_is_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Platform Engineer",
+        location="Delhi",
+        description=(
+            "Coordinate internal business platform "
+            "documentation and planning."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is False
+    assert (
+        "platform_engineering"
+        not in result.matched_role_groups
+    )
+
+
+def test_generic_application_support_with_evidence_is_relevant(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    job = create_job(
+        title="Application Support Engineer",
+        location="Pune",
+        description=(
+            "Monitor applications using Grafana and "
+            "handle production incident management."
+        ),
+    )
+
+    result = relevance_filter.evaluate(job)
+
+    assert result.is_relevant is True
+    assert "production_support" in result.matched_role_groups
+    assert "monitoring" in result.matched_technology_groups
+
+
+def test_excluded_generic_titles_are_rejected(
+    relevance_filter: JobRelevanceFilter,
+) -> None:
+    titles = (
+        "Technical Support Engineer Intern",
+        "Audiovisual Infrastructure Engineer",
+    )
+
+    for title in titles:
+        job = create_job(
+            title=title,
+            location="Pune",
+            description=(
+                "Work with Azure, AWS, Terraform, "
+                "Kubernetes, monitoring, and Linux."
+            ),
+        )
+
+        result = relevance_filter.evaluate(job)
+
+        assert result.is_relevant is False
+        assert result.negative_title_keywords

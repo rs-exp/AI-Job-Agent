@@ -1,8 +1,11 @@
 """
-Rules used by Job Relevance Filtering v0.1.
+Rules used by Job Relevance Filtering v0.2.
 
-These rules are intentionally separate from the filtering logic so
-they can be adjusted without rewriting the service.
+Explicit role titles qualify directly.
+
+Generic or ambiguous role titles qualify only when their job title,
+description, or other searchable fields contain sufficient supporting
+technology evidence.
 """
 
 
@@ -13,8 +16,8 @@ TARGET_ROLE_GROUPS = {
             "devops engineer",
             "devops",
             "ci/cd engineer",
-            "continuous integration",
-            "continuous deployment",
+            "continuous integration engineer",
+            "continuous deployment engineer",
         ),
     },
     "sre": {
@@ -24,7 +27,6 @@ TARGET_ROLE_GROUPS = {
             "site reliability",
             "sre engineer",
             "sre",
-            "reliability engineer",
         ),
     },
     "cloud_operations": {
@@ -46,30 +48,124 @@ TARGET_ROLE_GROUPS = {
             "aws support engineer",
             "cloud technical support",
             "cloud support specialist",
-            "technical support engineer",
+            "azure technical support engineer",
+            "aws technical support engineer",
+            "microsoft 365 support engineer",
+            "office 365 support engineer",
+            "m365 support engineer",
         ),
     },
     "platform_engineering": {
         "weight": 8,
         "keywords": (
-            "platform engineer",
             "platform operations engineer",
-            "infrastructure engineer",
-            "systems engineer",
-            "production engineer",
+            "cloud platform engineer",
         ),
     },
     "production_support": {
         "weight": 6,
         "keywords": (
             "production support engineer",
-            "application support engineer",
-            "technical operations engineer",
-            "operations support engineer",
-            "l2 support engineer",
-            "l3 support engineer",
         ),
     },
+}
+
+
+CONDITIONAL_ROLE_RULES = {
+    "sre": (
+        {
+            "keywords": (
+                "reliability engineer",
+            ),
+            "required_all_technology_groups": (
+                "monitoring",
+            ),
+            "required_any_technology_groups": (
+                "cloud",
+                "devops_tools",
+                "containers",
+                "systems",
+            ),
+            "minimum_technology_groups": 2,
+        },
+    ),
+    "cloud_operations": (
+        {
+            "keywords": (
+                "infrastructure engineer",
+                "systems administrator",
+                "system administrator",
+                "infrastructure administrator",
+            ),
+            "required_all_technology_groups": (),
+            "required_any_technology_groups": (
+                "cloud",
+                "devops_tools",
+                "containers",
+            ),
+            "minimum_technology_groups": 2,
+        },
+    ),
+    "cloud_support": (
+        {
+            "keywords": (
+                "technical support engineer",
+            ),
+            "required_all_technology_groups": (
+                "cloud",
+            ),
+            "required_any_technology_groups": (),
+            "minimum_technology_groups": 1,
+        },
+    ),
+    "platform_engineering": (
+        {
+            "keywords": (
+                "platform engineer",
+            ),
+            "required_all_technology_groups": (),
+            "required_any_technology_groups": (
+                "cloud",
+                "devops_tools",
+                "containers",
+            ),
+            "minimum_technology_groups": 1,
+        },
+        {
+            "keywords": (
+                "production engineer",
+            ),
+            "required_all_technology_groups": (),
+            "required_any_technology_groups": (
+                "cloud",
+                "devops_tools",
+                "containers",
+                "monitoring",
+                "systems",
+            ),
+            "minimum_technology_groups": 2,
+        },
+    ),
+    "production_support": (
+        {
+            "keywords": (
+                "application support engineer",
+                "technical operations engineer",
+                "operations support engineer",
+                "l2 support engineer",
+                "l3 support engineer",
+            ),
+            "required_all_technology_groups": (),
+            "required_any_technology_groups": (
+                "cloud",
+                "devops_tools",
+                "containers",
+                "monitoring",
+                "systems",
+            ),
+            "minimum_technology_groups": 1,
+        },
+    ),
 }
 
 
@@ -84,6 +180,9 @@ TECHNOLOGY_KEYWORDS = {
             "cloud computing",
             "microsoft 365",
             "office 365",
+            "m365",
+            "google cloud platform",
+            "gcp",
         ),
     },
     "devops_tools": {
@@ -96,6 +195,8 @@ TECHNOLOGY_KEYWORDS = {
             "azure devops",
             "gitlab ci",
             "ci/cd",
+            "continuous integration",
+            "continuous deployment",
         ),
     },
     "containers": {
@@ -106,6 +207,7 @@ TECHNOLOGY_KEYWORDS = {
             "aks",
             "eks",
             "containerization",
+            "containers",
         ),
     },
     "monitoring": {
@@ -118,6 +220,8 @@ TECHNOLOGY_KEYWORDS = {
             "observability",
             "monitoring",
             "incident management",
+            "application monitoring",
+            "infrastructure monitoring",
         ),
     },
     "systems": {
@@ -130,6 +234,10 @@ TECHNOLOGY_KEYWORDS = {
             "load balancer",
             "firewall",
             "virtual machine",
+            "virtual machines",
+            "active directory",
+            "entra id",
+            "rbac",
         ),
     },
 }
@@ -146,6 +254,9 @@ NEGATIVE_TITLE_KEYWORDS = (
     "graphic designer",
     "content writer",
     "customer success manager",
+    "intern",
+    "internship",
+    "audiovisual",
 )
 
 

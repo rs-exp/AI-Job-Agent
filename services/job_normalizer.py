@@ -188,19 +188,29 @@ class JobNormalizer:
         description: str | None,
     ) -> bool:
         """
-        Mark a job remote only when the source or text explicitly says so.
+        Mark a job remote when the source, title, location,
+        or description explicitly indicates remote work.
         """
 
         if current_value:
             return True
 
-        searchable_text = " ".join(
+        title_and_location = " ".join(
             [
                 title,
                 location,
-                description or "",
             ]
-        ).lower()
+        ).casefold()
+
+        if re.search(
+            r"(?<!\w)remote(?!\w)",
+            title_and_location,
+        ):
+            return True
+
+        description_text = (
+            description or ""
+        ).casefold()
 
         remote_phrases = (
             "fully remote",
@@ -209,9 +219,11 @@ class JobNormalizer:
             "work from home",
             "work-from-home",
             "location: remote",
+            "distributed team",
+            "distributed workforce",
         )
 
         return any(
-            phrase in searchable_text
+            phrase in description_text
             for phrase in remote_phrases
         )
