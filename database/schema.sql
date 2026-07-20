@@ -22,7 +22,15 @@ CREATE TABLE IF NOT EXISTS job_sources (
     notes TEXT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_jobs_shortlist_status
+    CHECK (
+        shortlist_status IN (
+            'not_reviewed',
+            'shortlisted',
+            'rejected'
+        )
+    )
 );
 
 
@@ -68,6 +76,12 @@ CREATE TABLE IF NOT EXISTS jobs (
     is_suitable BOOLEAN,
     suitability_details JSONB,
     suitability_evaluated_at TIMESTAMPTZ,
+    shortlist_status VARCHAR(30)
+    NOT NULL DEFAULT 'not_reviewed',
+
+    shortlist_notes TEXT,
+
+    shortlist_decided_at TIMESTAMPTZ,
 
     title VARCHAR(255) NOT NULL,
     company VARCHAR(255) NOT NULL,
@@ -88,7 +102,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     collected_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    );
 
 
 -- =========================================================
@@ -161,3 +175,6 @@ ON jobs(suitability_score DESC);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_is_suitable
 ON jobs(is_suitable);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_shortlist_status
+ON jobs(shortlist_status);
