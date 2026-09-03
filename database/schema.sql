@@ -28,7 +28,14 @@ CREATE TABLE IF NOT EXISTS job_sources (
         shortlist_status IN (
             'not_reviewed',
             'shortlisted',
-            'rejected'
+            'rejected',
+            'not_applied',
+            'applied',
+            'screening',
+            'interviewing',
+            'offer',
+            'rejected',
+            'withdrawn'
         )
     )
 );
@@ -82,6 +89,15 @@ CREATE TABLE IF NOT EXISTS jobs (
     shortlist_notes TEXT,
 
     shortlist_decided_at TIMESTAMPTZ,
+
+    application_status VARCHAR(30)
+    NOT NULL DEFAULT 'not_applied',
+
+    application_notes TEXT,
+
+    applied_at TIMESTAMPTZ,
+
+    application_updated_at TIMESTAMPTZ,
 
     title VARCHAR(255) NOT NULL,
     company VARCHAR(255) NOT NULL,
@@ -178,3 +194,9 @@ ON jobs(is_suitable);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_shortlist_status
 ON jobs(shortlist_status);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_application_status
+ON jobs(application_status);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_applied_at
+ON jobs(applied_at DESC);
