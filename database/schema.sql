@@ -189,3 +189,23 @@ CREATE TABLE IF NOT EXISTS jobs_raw (
     raw_payload JSONB NOT NULL,
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS jobs_normalized (
+    id SERIAL PRIMARY KEY,
+    raw_job_id INTEGER REFERENCES jobs_raw(id) ON DELETE CASCADE,
+    source_name VARCHAR(100) NOT NULL,
+    external_job_id VARCHAR(100),
+    title TEXT NOT NULL,
+    company_name TEXT,
+    location TEXT,
+    job_type TEXT,
+    category TEXT,
+    tags JSONB,
+    salary TEXT,
+    job_url TEXT UNIQUE NOT NULL,
+    description TEXT,
+    publication_date TIMESTAMP,
+    normalized_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(raw_job_id)
+);
