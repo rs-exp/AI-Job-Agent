@@ -15,3 +15,6 @@ data/source_check_results.csv
 /sources.csv
 
 /data/candidate_profile.json
+
+/reports/*.md
+/reports/*.csv
