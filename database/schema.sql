@@ -178,3 +178,14 @@ ON jobs(is_suitable);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_shortlist_status
 ON jobs(shortlist_status);
+
+CREATE TABLE IF NOT EXISTS jobs_raw (
+    id SERIAL PRIMARY KEY,
+    source_name VARCHAR(100) NOT NULL,
+    external_job_id VARCHAR(100),
+    job_title TEXT,
+    company_name TEXT,
+    job_url TEXT UNIQUE,
+    raw_payload JSONB NOT NULL,
+    fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
