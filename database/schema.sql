@@ -265,3 +265,9 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     total_scored_jobs INTEGER DEFAULT 0,
     error_message TEXT
 );
+
+ALTER TABLE job_scores
+ADD COLUMN IF NOT EXISTS fit_bucket VARCHAR(50);
+
+ALTER TABLE job_scores
+ADD COLUMN IF NOT EXISTS recommendation TEXT;
