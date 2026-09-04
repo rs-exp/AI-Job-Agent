@@ -2,7 +2,7 @@ import os
 import re
 import html
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -25,9 +25,10 @@ def clean_html(raw_text: Optional[str]) -> str:
     if not raw_text:
         return ""
 
-    text = html.unescape(raw_text)
+    text = html.unescape(str(raw_text))
     text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"</p>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</li>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<[^>]+>", "", text)
     text = re.sub(r"\n\s*\n+", "\n\n", text)
     text = re.sub(r"[ \t]+", " ", text)
@@ -40,10 +41,9 @@ def parse_publication_date(value: Optional[str]):
         return None
 
     try:
-        cleaned_value = value.replace("Z", "+00:00")
+        cleaned_value = str(value).replace("Z", "+00:00")
         parsed_date = datetime.fromisoformat(cleaned_value)
 
-        # PostgreSQL TIMESTAMP without timezone works cleanly with naive datetime
         if parsed_date.tzinfo:
             parsed_date = parsed_date.replace(tzinfo=None)
 
@@ -51,6 +51,44 @@ def parse_publication_date(value: Optional[str]):
 
     except Exception:
         return None
+
+
+def parse_unix_timestamp(value: Any):
+    if not value:
+        return None
+
+    try:
+        return datetime.fromtimestamp(int(value))
+    except Exception:
+        return None
+
+
+def safe_strip(value: Any) -> str:
+    if value is None:
+        return ""
+
+    return str(value).strip()
+
+
+def safe_list(value: Any) -> list:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        cleaned_items = []
+
+        for item in value:
+            if isinstance(item, dict):
+                cleaned_items.append(str(item))
+            else:
+                cleaned_items.append(str(item).strip())
+
+        return [item for item in cleaned_items if item]
+
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+
+    return [str(value).strip()]
 
 
 def fetch_raw_jobs(conn):
@@ -70,47 +108,33 @@ def fetch_raw_jobs(conn):
 
 
 def normalize_remotive_job(raw_job_id, source_name, external_job_id, payload):
+    tags = safe_list(payload.get("tags", []))
+
     return {
         "raw_job_id": raw_job_id,
         "source_name": source_name,
-        "external_job_id": external_job_id,
-        "title": payload.get("title", "").strip(),
-        "company_name": payload.get("company_name", "").strip(),
-        "location": payload.get("candidate_required_location", "").strip(),
-        "job_type": payload.get("job_type", "").strip(),
-        "category": payload.get("category", "").strip(),
-        "tags": payload.get("tags", []),
-        "salary": payload.get("salary", "").strip() if payload.get("salary") else "",
-        "job_url": payload.get("url", "").strip(),
+        "external_job_id": safe_strip(external_job_id),
+        "title": safe_strip(payload.get("title")),
+        "company_name": safe_strip(payload.get("company_name")),
+        "location": safe_strip(payload.get("candidate_required_location")),
+        "job_type": safe_strip(payload.get("job_type")),
+        "category": safe_strip(payload.get("category")),
+        "tags": tags,
+        "salary": safe_strip(payload.get("salary")),
+        "job_url": safe_strip(payload.get("url")),
         "description": clean_html(payload.get("description", "")),
         "publication_date": parse_publication_date(payload.get("publication_date")),
     }
 
-def parse_unix_timestamp(value):
-    if not value:
-        return None
-
-    try:
-        return datetime.fromtimestamp(int(value))
-    except Exception:
-        return None
-
 
 def normalize_arbeitnow_job(raw_job_id, source_name, external_job_id, payload):
-    job_types = payload.get("job_types", [])
-    tags = payload.get("tags", [])
+    job_types = safe_list(payload.get("job_types", []))
+    tags = safe_list(payload.get("tags", []))
 
-    if isinstance(job_types, list):
-        job_type = ", ".join(job_types)
-    else:
-        job_type = str(job_types or "")
+    job_type = ", ".join(job_types)
+    category = ", ".join(tags[:3])
 
-    if isinstance(tags, list):
-        category = ", ".join(tags[:3])
-    else:
-        category = str(tags or "")
-
-    location = payload.get("location", "") or ""
+    location = safe_strip(payload.get("location"))
 
     if payload.get("remote") is True:
         if location:
@@ -121,15 +145,15 @@ def normalize_arbeitnow_job(raw_job_id, source_name, external_job_id, payload):
     return {
         "raw_job_id": raw_job_id,
         "source_name": source_name,
-        "external_job_id": external_job_id,
-        "title": payload.get("title", "").strip(),
-        "company_name": payload.get("company_name", "").strip(),
-        "location": location.strip(),
-        "job_type": job_type.strip(),
-        "category": category.strip(),
-        "tags": tags if isinstance(tags, list) else [],
+        "external_job_id": safe_strip(external_job_id),
+        "title": safe_strip(payload.get("title")),
+        "company_name": safe_strip(payload.get("company_name")),
+        "location": location,
+        "job_type": job_type,
+        "category": category,
+        "tags": tags,
         "salary": "",
-        "job_url": payload.get("url", "").strip(),
+        "job_url": safe_strip(payload.get("url")),
         "description": clean_html(payload.get("description", "")),
         "publication_date": parse_unix_timestamp(payload.get("created_at")),
     }
@@ -192,6 +216,26 @@ def save_normalized_job(conn, job):
         )
 
 
+def normalize_job_by_source(raw_job_id, source_name, external_job_id, payload):
+    if source_name == "Remotive":
+        return normalize_remotive_job(
+            raw_job_id,
+            source_name,
+            external_job_id,
+            payload,
+        )
+
+    if source_name == "Arbeitnow":
+        return normalize_arbeitnow_job(
+            raw_job_id,
+            source_name,
+            external_job_id,
+            payload,
+        )
+
+    return None
+
+
 def main():
     print("Starting job normalization...")
 
@@ -203,26 +247,20 @@ def main():
 
         normalized_count = 0
         skipped_count = 0
+        source_counts = {}
 
         for raw_job_id, source_name, external_job_id, payload in raw_jobs:
-            if source_name == "Remotive":
-    normalized_job = normalize_remotive_job(
-        raw_job_id,
-        source_name,
-        external_job_id,
-        payload,
-    )
-elif source_name == "Arbeitnow":
-    normalized_job = normalize_arbeitnow_job(
-        raw_job_id,
-        source_name,
-        external_job_id,
-        payload,
-    )
-else:
-    print(f"Skipped unsupported source: {source_name}")
-    skipped_count += 1
-    continue
+            normalized_job = normalize_job_by_source(
+                raw_job_id,
+                source_name,
+                external_job_id,
+                payload,
+            )
+
+            if normalized_job is None:
+                print(f"Skipped unsupported source: {source_name}")
+                skipped_count += 1
+                continue
 
             if not normalized_job["title"] or not normalized_job["job_url"]:
                 print(f"Skipped invalid job record. Raw job ID: {raw_job_id}")
@@ -232,9 +270,12 @@ else:
             save_normalized_job(conn, normalized_job)
             normalized_count += 1
 
+            source_counts[source_name] = source_counts.get(source_name, 0) + 1
+
             print(
                 f"Normalized: {normalized_job['title']} "
-                f"at {normalized_job['company_name']}"
+                f"at {normalized_job['company_name']} "
+                f"from {source_name}"
             )
 
         conn.commit()
@@ -242,6 +283,10 @@ else:
         print("\nJob normalization completed.")
         print(f"Normalized jobs: {normalized_count}")
         print(f"Skipped jobs: {skipped_count}")
+
+        print("\nSource-wise normalized count:")
+        for source, count in sorted(source_counts.items()):
+            print(f"- {source}: {count}")
 
     except Exception as error:
         conn.rollback()
