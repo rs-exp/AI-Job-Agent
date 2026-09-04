@@ -37,6 +37,10 @@ PIPELINE_STEPS = [
         "name": "Job Match Scoring",
         "script": "agents/job_match_scorer.py",
     },
+    {
+        "name": "Top Job Report Generation",
+        "script": "agents/job_report_generator.py",
+    },
 ]
 
 
