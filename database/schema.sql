@@ -251,3 +251,17 @@ ON job_scores(overall_score DESC);
 
 CREATE INDEX IF NOT EXISTS idx_job_scores_normalized_job_id
 ON job_scores(normalized_job_id);
+
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    id SERIAL PRIMARY KEY,
+    run_name VARCHAR(100) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP,
+    total_raw_jobs INTEGER DEFAULT 0,
+    total_normalized_jobs INTEGER DEFAULT 0,
+    total_unique_jobs INTEGER DEFAULT 0,
+    total_duplicate_jobs INTEGER DEFAULT 0,
+    total_scored_jobs INTEGER DEFAULT 0,
+    error_message TEXT
+);
