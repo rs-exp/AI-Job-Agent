@@ -209,3 +209,21 @@ CREATE TABLE IF NOT EXISTS jobs_normalized (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(raw_job_id)
 );
+
+ALTER TABLE jobs_normalized
+ADD COLUMN IF NOT EXISTS dedupe_key TEXT;
+
+ALTER TABLE jobs_normalized
+ADD COLUMN IF NOT EXISTS is_duplicate BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE jobs_normalized
+ADD COLUMN IF NOT EXISTS duplicate_of_job_id INTEGER;
+
+ALTER TABLE jobs_normalized
+ADD COLUMN IF NOT EXISTS dedupe_reason TEXT;
+
+ALTER TABLE jobs_normalized
+ADD COLUMN IF NOT EXISTS deduped_at TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_jobs_normalized_dedupe_key
+ON jobs_normalized(dedupe_key);
