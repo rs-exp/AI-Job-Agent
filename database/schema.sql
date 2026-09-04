@@ -271,3 +271,38 @@ ADD COLUMN IF NOT EXISTS fit_bucket VARCHAR(50);
 
 ALTER TABLE job_scores
 ADD COLUMN IF NOT EXISTS recommendation TEXT;
+
+CREATE TABLE IF NOT EXISTS job_application_decisions (
+    id SERIAL PRIMARY KEY,
+    normalized_job_id INTEGER REFERENCES jobs_normalized(id) ON DELETE CASCADE,
+    scoring_version VARCHAR(50) NOT NULL,
+    decision_status VARCHAR(50) NOT NULL DEFAULT 'new',
+    priority_score INTEGER DEFAULT 0,
+    fit_bucket VARCHAR(50),
+    decision_reason TEXT,
+    recommendation TEXT,
+    user_notes TEXT,
+    applied_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(normalized_job_id, scoring_version),
+    CHECK (
+        decision_status IN (
+            'new',
+            'apply',
+            'review',
+            'save_for_later',
+            'skip',
+            'applied'
+        )
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_application_decisions_status
+ON job_application_decisions(decision_status);
+
+CREATE INDEX IF NOT EXISTS idx_job_application_decisions_priority
+ON job_application_decisions(priority_score DESC);
+
+CREATE INDEX IF NOT EXISTS idx_job_application_decisions_job_id
+ON job_application_decisions(normalized_job_id);
