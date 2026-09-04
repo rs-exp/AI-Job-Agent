@@ -14,13 +14,12 @@ MARKDOWN_REPORT = REPORTS_DIR / "top_jobs_report.md"
 CSV_REPORT = REPORTS_DIR / "top_jobs_report.csv"
 
 SCORING_VERSION = "rule_v0.2"
-MIN_SCORE = 20
-LIMIT = 30
+LIMIT = 40
 
-ACTIONABLE_BUCKETS = [
-    "Strong Match",
-    "Good Match",
-    "Weak Match",
+REPORT_STATUSES = [
+    "apply",
+    "review",
+    "save_for_later",
 ]
 
 
@@ -44,15 +43,23 @@ def format_list(value):
     return str(value)
 
 
-def fetch_bucket_summary(conn):
+def fetch_decision_summary(conn):
     query = """
         SELECT
-            COALESCE(fit_bucket, 'Unclassified') AS fit_bucket,
+            decision_status,
             COUNT(*) AS job_count
-        FROM job_scores
+        FROM job_application_decisions
         WHERE scoring_version = %s
-        GROUP BY COALESCE(fit_bucket, 'Unclassified')
-        ORDER BY job_count DESC;
+        GROUP BY decision_status
+        ORDER BY
+            CASE decision_status
+                WHEN 'apply' THEN 1
+                WHEN 'review' THEN 2
+                WHEN 'save_for_later' THEN 3
+                WHEN 'skip' THEN 4
+                WHEN 'applied' THEN 5
+                ELSE 6
+            END;
     """
 
     with conn.cursor() as cur:
@@ -60,16 +67,23 @@ def fetch_bucket_summary(conn):
         return cur.fetchall()
 
 
-def fetch_top_jobs(conn):
+def fetch_report_jobs(conn):
     query = """
         SELECT
+            jad.decision_status,
+            jad.priority_score,
+            jad.fit_bucket,
+            jad.decision_reason,
+            jad.recommendation,
             js.overall_score,
-            js.fit_bucket,
             js.role_score,
             js.skill_score,
             js.experience_score,
             js.location_score,
             js.penalty_score,
+            js.matched_keywords,
+            js.red_flags,
+            js.score_summary,
             j.source_name,
             j.title,
             j.company_name,
@@ -77,24 +91,27 @@ def fetch_top_jobs(conn):
             j.job_type,
             j.category,
             j.job_url,
-            js.matched_keywords,
-            js.red_flags,
-            js.recommendation,
-            js.score_summary,
-            js.scored_at
-        FROM job_scores js
+            jad.updated_at
+        FROM job_application_decisions jad
+        JOIN job_scores js
+            ON jad.normalized_job_id = js.normalized_job_id
+            AND jad.scoring_version = js.scoring_version
         JOIN jobs_normalized j
-            ON js.normalized_job_id = j.id
+            ON jad.normalized_job_id = j.id
         WHERE
-            js.scoring_version = %s
+            jad.scoring_version = %s
             AND COALESCE(j.is_duplicate, FALSE) = FALSE
-            AND js.overall_score >= %s
-            AND js.fit_bucket = ANY(%s)
+            AND jad.decision_status = ANY(%s)
         ORDER BY
-            js.overall_score DESC,
+            CASE jad.decision_status
+                WHEN 'apply' THEN 1
+                WHEN 'review' THEN 2
+                WHEN 'save_for_later' THEN 3
+                ELSE 4
+            END,
+            jad.priority_score DESC,
             js.skill_score DESC,
-            js.role_score DESC,
-            js.scored_at DESC
+            js.role_score DESC
         LIMIT %s;
     """
 
@@ -103,61 +120,64 @@ def fetch_top_jobs(conn):
             query,
             (
                 SCORING_VERSION,
-                MIN_SCORE,
-                ACTIONABLE_BUCKETS,
+                REPORT_STATUSES,
                 LIMIT,
             ),
         )
         return cur.fetchall()
 
 
-def write_markdown_report(rows, bucket_summary):
+def write_markdown_report(rows, decision_summary):
     generated_at = datetime.now().isoformat(timespec="seconds")
 
     lines = []
-    lines.append("# AI Job Agent - Top Job Matches Report")
+    lines.append("# AI Job Agent - Application Decision Report")
     lines.append("")
     lines.append(f"Generated at: {generated_at}")
     lines.append(f"Scoring version: `{SCORING_VERSION}`")
-    lines.append(f"Minimum score: `{MIN_SCORE}`")
-    lines.append(f"Jobs included: `{len(rows)}`")
+    lines.append(f"Jobs included in report: `{len(rows)}`")
     lines.append("")
     lines.append("---")
     lines.append("")
 
-    lines.append("## Fit Bucket Summary")
+    lines.append("## Decision Summary")
     lines.append("")
 
-    if bucket_summary:
-        lines.append("| Fit Bucket | Job Count |")
+    if decision_summary:
+        lines.append("| Decision Status | Job Count |")
         lines.append("|---|---:|")
 
-        for bucket, count in bucket_summary:
-            lines.append(f"| {bucket} | {count} |")
+        for status, count in decision_summary:
+            lines.append(f"| {status} | {count} |")
     else:
-        lines.append("No scoring summary available.")
+        lines.append("No application decisions found.")
 
     lines.append("")
     lines.append("---")
     lines.append("")
 
-    lines.append("## Top Job Matches")
+    lines.append("## Actionable Jobs")
     lines.append("")
 
     if not rows:
-        lines.append("No actionable jobs matched the current score threshold.")
-        lines.append("")
-        lines.append("Recommended next action: run the pipeline again after adding better job sources.")
+        lines.append("No actionable jobs found. Run the full pipeline again after adding better sources.")
     else:
         for index, row in enumerate(rows, start=1):
             (
-                overall_score,
+                decision_status,
+                priority_score,
                 fit_bucket,
+                decision_reason,
+                recommendation,
+                overall_score,
                 role_score,
                 skill_score,
                 experience_score,
                 location_score,
                 penalty_score,
+                matched_keywords,
+                red_flags,
+                score_summary,
                 source_name,
                 title,
                 company_name,
@@ -165,26 +185,34 @@ def write_markdown_report(rows, bucket_summary):
                 job_type,
                 category,
                 job_url,
-                matched_keywords,
-                red_flags,
-                recommendation,
-                score_summary,
-                scored_at,
+                updated_at,
             ) = row
 
             lines.append(f"## {index}. {title}")
             lines.append("")
+            lines.append(f"**Decision:** {decision_status}")
+            lines.append(f"**Priority Score:** {priority_score}/100")
+            lines.append(f"**Fit Bucket:** {fit_bucket}")
             lines.append(f"**Company:** {company_name}")
             lines.append(f"**Source:** {source_name}")
             lines.append(f"**Location:** {location}")
             lines.append(f"**Job Type:** {job_type}")
             lines.append(f"**Category:** {category}")
-            lines.append(f"**Fit Bucket:** {fit_bucket}")
-            lines.append(f"**Overall Score:** {overall_score}/100")
+            lines.append("")
+
+            lines.append("### Decision Reason")
+            lines.append("")
+            lines.append(decision_reason or "")
+            lines.append("")
+
+            lines.append("### Recommendation")
+            lines.append("")
+            lines.append(recommendation or "")
             lines.append("")
 
             lines.append("### Score Breakdown")
             lines.append("")
+            lines.append(f"- Overall Score: {overall_score}/100")
             lines.append(f"- Role Score: {role_score}/100")
             lines.append(f"- Skill Score: {skill_score}/100")
             lines.append(f"- Experience Score: {experience_score}/100")
@@ -198,16 +226,11 @@ def write_markdown_report(rows, bucket_summary):
             lines.append(f"**Red Flags:** {format_list(red_flags)}")
             lines.append("")
 
-            lines.append("### Recommendation")
-            lines.append("")
-            lines.append(recommendation or "")
-            lines.append("")
-
             lines.append("### Score Summary")
             lines.append("")
             lines.append(score_summary or "")
             lines.append("")
-            lines.append(f"**Scored At:** {scored_at}")
+            lines.append(f"**Decision Updated At:** {updated_at}")
             lines.append(f"**Job URL:** {job_url}")
             lines.append("")
             lines.append("---")
@@ -219,13 +242,20 @@ def write_markdown_report(rows, bucket_summary):
 
 def write_csv_report(rows):
     fieldnames = [
-        "overall_score",
+        "decision_status",
+        "priority_score",
         "fit_bucket",
+        "decision_reason",
+        "recommendation",
+        "overall_score",
         "role_score",
         "skill_score",
         "experience_score",
         "location_score",
         "penalty_score",
+        "matched_keywords",
+        "red_flags",
+        "score_summary",
         "source_name",
         "title",
         "company_name",
@@ -233,11 +263,7 @@ def write_csv_report(rows):
         "job_type",
         "category",
         "job_url",
-        "matched_keywords",
-        "red_flags",
-        "recommendation",
-        "score_summary",
-        "scored_at",
+        "decision_updated_at",
     ]
 
     with open(CSV_REPORT, "w", newline="", encoding="utf-8") as file:
@@ -246,13 +272,13 @@ def write_csv_report(rows):
 
         for row in rows:
             row = list(row)
-            row[14] = format_list(row[14])
-            row[15] = format_list(row[15])
+            row[11] = format_list(row[11])
+            row[12] = format_list(row[12])
             writer.writerow(row)
 
 
 def main():
-    print("Starting top job report generation...")
+    print("Starting decision-aware job report generation...")
     print(f"Scoring version: {SCORING_VERSION}")
 
     REPORTS_DIR.mkdir(exist_ok=True)
@@ -260,13 +286,13 @@ def main():
     conn = get_db_connection()
 
     try:
-        bucket_summary = fetch_bucket_summary(conn)
-        rows = fetch_top_jobs(conn)
+        decision_summary = fetch_decision_summary(conn)
+        rows = fetch_report_jobs(conn)
 
-        print(f"Fit bucket groups found: {len(bucket_summary)}")
-        print(f"Top actionable jobs fetched: {len(rows)}")
+        print(f"Decision groups found: {len(decision_summary)}")
+        print(f"Actionable jobs fetched: {len(rows)}")
 
-        write_markdown_report(rows, bucket_summary)
+        write_markdown_report(rows, decision_summary)
         write_csv_report(rows)
 
         print("Report generation completed.")
