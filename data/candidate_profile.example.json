@@ -1,0 +1,93 @@
+{
+  "candidate_name": "Rachit Srivastava",
+  "current_role": "Cloud Support Engineer",
+  "experience_years": 2.6,
+  "target_roles": [
+    "DevOps Engineer",
+    "Cloud Engineer",
+    "Site Reliability Engineer",
+    "Platform Engineer",
+    "Azure Engineer",
+    "AWS Cloud Engineer",
+    "Technical Support Engineer L3"
+  ],
+  "preferred_locations": [
+    "Remote",
+    "India",
+    "Pune",
+    "Mumbai",
+    "Bengaluru",
+    "Hyderabad",
+    "Noida",
+    "Gurugram"
+  ],
+  "preferred_work_modes": [
+    "remote",
+    "hybrid",
+    "onsite"
+  ],
+  "strong_keywords": [
+    "azure",
+    "aws",
+    "microsoft 365",
+    "m365",
+    "cloud support",
+    "technical support",
+    "troubleshooting",
+    "incident management",
+    "rca",
+    "root cause analysis",
+    "escalation",
+    "sla",
+    "powershell",
+    "networking",
+    "dns",
+    "linux",
+    "windows server",
+    "active directory",
+    "entra id",
+    "iam"
+  ],
+  "learning_keywords": [
+    "python",
+    "sql",
+    "postgresql",
+    "devops",
+    "ci/cd",
+    "jenkins",
+    "docker",
+    "kubernetes",
+    "terraform",
+    "ansible",
+    "github actions",
+    "playwright",
+    "automation",
+    "langgraph",
+    "ai agents"
+  ],
+  "role_keywords": [
+    "devops",
+    "cloud engineer",
+    "site reliability",
+    "sre",
+    "platform engineer",
+    "azure",
+    "aws",
+    "technical support",
+    "cloud support"
+  ],
+  "negative_keywords": [
+    "head of",
+    "director",
+    "vp",
+    "principal",
+    "staff engineer",
+    "10+ years",
+    "12+ years",
+    "15+ years",
+    "marketing",
+    "sales",
+    "copywriter",
+    "writer"
+  ]
+}

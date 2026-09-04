@@ -13,3 +13,5 @@ data/source_check_results.csv
 /scraper3.py
 /scraper4.py
 /sources.csv
+
+/data/candidate_profile.json

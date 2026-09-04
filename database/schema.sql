@@ -227,3 +227,27 @@ ADD COLUMN IF NOT EXISTS deduped_at TIMESTAMP;
 
 CREATE INDEX IF NOT EXISTS idx_jobs_normalized_dedupe_key
 ON jobs_normalized(dedupe_key);
+
+CREATE TABLE IF NOT EXISTS job_scores (
+    id SERIAL PRIMARY KEY,
+    normalized_job_id INTEGER REFERENCES jobs_normalized(id) ON DELETE CASCADE,
+    scoring_version VARCHAR(50) NOT NULL DEFAULT 'rule_v0.1',
+    overall_score INTEGER NOT NULL,
+    role_score INTEGER NOT NULL,
+    skill_score INTEGER NOT NULL,
+    experience_score INTEGER NOT NULL,
+    location_score INTEGER NOT NULL,
+    penalty_score INTEGER NOT NULL DEFAULT 0,
+    matched_keywords JSONB,
+    missing_keywords JSONB,
+    red_flags JSONB,
+    score_summary TEXT,
+    scored_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(normalized_job_id, scoring_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_scores_overall_score
+ON job_scores(overall_score DESC);
+
+CREATE INDEX IF NOT EXISTS idx_job_scores_normalized_job_id
+ON job_scores(normalized_job_id);
