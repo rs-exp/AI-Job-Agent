@@ -86,6 +86,54 @@ def normalize_remotive_job(raw_job_id, source_name, external_job_id, payload):
         "publication_date": parse_publication_date(payload.get("publication_date")),
     }
 
+def parse_unix_timestamp(value):
+    if not value:
+        return None
+
+    try:
+        return datetime.fromtimestamp(int(value))
+    except Exception:
+        return None
+
+
+def normalize_arbeitnow_job(raw_job_id, source_name, external_job_id, payload):
+    job_types = payload.get("job_types", [])
+    tags = payload.get("tags", [])
+
+    if isinstance(job_types, list):
+        job_type = ", ".join(job_types)
+    else:
+        job_type = str(job_types or "")
+
+    if isinstance(tags, list):
+        category = ", ".join(tags[:3])
+    else:
+        category = str(tags or "")
+
+    location = payload.get("location", "") or ""
+
+    if payload.get("remote") is True:
+        if location:
+            location = f"Remote - {location}"
+        else:
+            location = "Remote"
+
+    return {
+        "raw_job_id": raw_job_id,
+        "source_name": source_name,
+        "external_job_id": external_job_id,
+        "title": payload.get("title", "").strip(),
+        "company_name": payload.get("company_name", "").strip(),
+        "location": location.strip(),
+        "job_type": job_type.strip(),
+        "category": category.strip(),
+        "tags": tags if isinstance(tags, list) else [],
+        "salary": "",
+        "job_url": payload.get("url", "").strip(),
+        "description": clean_html(payload.get("description", "")),
+        "publication_date": parse_unix_timestamp(payload.get("created_at")),
+    }
+
 
 def save_normalized_job(conn, job):
     query = """
@@ -158,16 +206,23 @@ def main():
 
         for raw_job_id, source_name, external_job_id, payload in raw_jobs:
             if source_name == "Remotive":
-                normalized_job = normalize_remotive_job(
-                    raw_job_id,
-                    source_name,
-                    external_job_id,
-                    payload,
-                )
-            else:
-                print(f"Skipped unsupported source: {source_name}")
-                skipped_count += 1
-                continue
+    normalized_job = normalize_remotive_job(
+        raw_job_id,
+        source_name,
+        external_job_id,
+        payload,
+    )
+elif source_name == "Arbeitnow":
+    normalized_job = normalize_arbeitnow_job(
+        raw_job_id,
+        source_name,
+        external_job_id,
+        payload,
+    )
+else:
+    print(f"Skipped unsupported source: {source_name}")
+    skipped_count += 1
+    continue
 
             if not normalized_job["title"] or not normalized_job["job_url"]:
                 print(f"Skipped invalid job record. Raw job ID: {raw_job_id}")
