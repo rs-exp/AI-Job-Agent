@@ -94,20 +94,37 @@ def save_application_decision(
             fit_bucket,
             decision_reason,
             recommendation,
+            manual_override,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE, CURRENT_TIMESTAMP)
         ON CONFLICT (normalized_job_id, scoring_version)
         DO UPDATE SET
             decision_status =
                 CASE
                     WHEN job_application_decisions.decision_status = 'applied'
                     THEN job_application_decisions.decision_status
+
+                    WHEN COALESCE(job_application_decisions.manual_override, FALSE) = TRUE
+                    THEN job_application_decisions.decision_status
+
                     ELSE EXCLUDED.decision_status
                 END,
+
             priority_score = EXCLUDED.priority_score,
             fit_bucket = EXCLUDED.fit_bucket,
-            decision_reason = EXCLUDED.decision_reason,
+
+            decision_reason =
+                CASE
+                    WHEN job_application_decisions.decision_status = 'applied'
+                    THEN job_application_decisions.decision_reason
+
+                    WHEN COALESCE(job_application_decisions.manual_override, FALSE) = TRUE
+                    THEN job_application_decisions.decision_reason
+
+                    ELSE EXCLUDED.decision_reason
+                END,
+
             recommendation = EXCLUDED.recommendation,
             updated_at = CURRENT_TIMESTAMP;
     """
@@ -184,6 +201,9 @@ def main():
 
         for status, count in sorted(status_counts.items()):
             print(f"- {status}: {count}")
+
+        print("\nManual override protection is active.")
+        print("Existing manual decisions and applied jobs will not be overwritten.")
 
     except Exception as error:
         conn.rollback()

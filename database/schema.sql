@@ -306,3 +306,15 @@ ON job_application_decisions(priority_score DESC);
 
 CREATE INDEX IF NOT EXISTS idx_job_application_decisions_job_id
 ON job_application_decisions(normalized_job_id);
+
+ALTER TABLE job_application_decisions
+ADD COLUMN IF NOT EXISTS manual_override BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE job_application_decisions
+ADD COLUMN IF NOT EXISTS manual_override_reason TEXT;
+
+ALTER TABLE job_application_decisions
+ADD COLUMN IF NOT EXISTS last_user_updated_at TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_job_application_decisions_manual_override
+ON job_application_decisions(manual_override);
