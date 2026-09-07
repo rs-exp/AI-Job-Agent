@@ -1,5 +1,7 @@
 # AI Job Agent
 
+[![CI](https://github.com/rs-exp/AI-Job-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/rs-exp/AI-Job-Agent/actions/workflows/ci.yml)
+
 A multi-source job discovery and candidate-fit platform. It ingests postings from several job boards, normalises them into a single internal contract, deduplicates, scores them against a candidate profile, and turns those scores into an auditable application workflow.
 
 Built in Python on PostgreSQL. The scoring engine is deliberately deterministic and explainable — not because a model wouldn't help, but so that when a model is added there is a baseline to measure it against.
