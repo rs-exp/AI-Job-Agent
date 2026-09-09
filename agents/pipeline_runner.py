@@ -53,6 +53,10 @@ PIPELINE_STEPS = [
         "name": "Application Message Generation",
         "script": "agents/application_message_generator.py",
     },
+    {
+        "name": "Resume Tailoring Pack Generation",
+        "script": "agents/resume_tailoring_pack_generator.py",
+    },
 ]
 
 
