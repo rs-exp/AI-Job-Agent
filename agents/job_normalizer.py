@@ -159,6 +159,94 @@ def normalize_arbeitnow_job(raw_job_id, source_name, external_job_id, payload):
     }
 
 
+def build_manual_sweep_description(payload):
+    description_parts = []
+
+    why = safe_strip(payload.get("why"))
+    if why:
+        description_parts.append(f"Reason: {why}")
+
+    tier = safe_strip(payload.get("tier"))
+    if tier:
+        description_parts.append(f"Tier: {tier}")
+
+    apply_type = safe_strip(payload.get("apply_type"))
+    if apply_type:
+        description_parts.append(f"Apply type: {apply_type}")
+
+    original_source = safe_strip(payload.get("original_source"))
+    if original_source:
+        description_parts.append(f"Original source: {original_source}")
+
+    sheet_name = safe_strip(payload.get("sheet_name"))
+    if sheet_name:
+        description_parts.append(f"Sheet: {sheet_name}")
+
+    raw_row = payload.get("raw_row", {})
+    if isinstance(raw_row, dict):
+        raw_values = []
+
+        for key, value in raw_row.items():
+            cleaned_key = safe_strip(key)
+            cleaned_value = safe_strip(value)
+
+            if cleaned_key and cleaned_value:
+                raw_values.append(f"{cleaned_key}: {cleaned_value}")
+
+        if raw_values:
+            description_parts.append("Raw Excel row: " + " | ".join(raw_values))
+
+    return clean_html("\n".join(description_parts))
+
+
+def normalize_manual_sweep_job(raw_job_id, source_name, external_job_id, payload):
+    tags = []
+
+    tier = safe_strip(payload.get("tier"))
+    apply_type = safe_strip(payload.get("apply_type"))
+    original_source = safe_strip(payload.get("original_source"))
+    sheet_name = safe_strip(payload.get("sheet_name"))
+
+    if tier:
+        tags.append(f"tier:{tier}")
+
+    if apply_type:
+        tags.append(f"apply_type:{apply_type}")
+
+    if original_source:
+        tags.append(f"source:{original_source}")
+
+    if sheet_name:
+        tags.append(f"sheet:{sheet_name}")
+
+    category_parts = []
+
+    if tier:
+        category_parts.append(f"Tier {tier}")
+
+    if original_source:
+        category_parts.append(original_source)
+
+    if sheet_name:
+        category_parts.append(sheet_name)
+
+    return {
+        "raw_job_id": raw_job_id,
+        "source_name": source_name,
+        "external_job_id": safe_strip(external_job_id),
+        "title": safe_strip(payload.get("title")),
+        "company_name": safe_strip(payload.get("company_name")),
+        "location": safe_strip(payload.get("location")),
+        "job_type": safe_strip(payload.get("apply_type")),
+        "category": ", ".join(category_parts),
+        "tags": tags,
+        "salary": "",
+        "job_url": safe_strip(payload.get("job_url")) or f"manual://{safe_strip(external_job_id) or raw_job_id}",
+        "description": build_manual_sweep_description(payload),
+        "publication_date": None,
+    }
+
+
 def save_normalized_job(conn, job):
     query = """
         INSERT INTO jobs_normalized (
@@ -227,6 +315,14 @@ def normalize_job_by_source(raw_job_id, source_name, external_job_id, payload):
 
     if source_name == "Arbeitnow":
         return normalize_arbeitnow_job(
+            raw_job_id,
+            source_name,
+            external_job_id,
+            payload,
+        )
+
+    if source_name == "ManualSweep":
+        return normalize_manual_sweep_job(
             raw_job_id,
             source_name,
             external_job_id,

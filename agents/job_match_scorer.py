@@ -162,7 +162,6 @@ HARD_NEGATIVE_TITLE_KEYWORDS = [
     "customer service",
     "content reviewer",
     "head of marketing",
-    "brand",
     "e-commerce",
     "working student",
     "intern",
@@ -318,7 +317,6 @@ def calculate_penalty_score(title_text, combined_text):
         "sales",
         "copywriting",
         "content",
-        "brand",
         "customer care",
         "e-commerce",
         "partnership",
@@ -435,11 +433,43 @@ def score_job(job):
     red_flags = sorted(set(experience_flags + negative_flags))
     matched_keywords = sorted(set(role_matches + matched_skills))
 
+    curated_bonus = 0
+
+    high_intent_title_patterns = [
+        "azure devops",
+        "aws devops",
+        "kubernetes / devops",
+        "kubernetes devops",
+        "site reliability engineer",
+        "devops engineer",
+        "cloud support engineer",
+        "azure cloud engineer",
+        "cloud engineer",
+        "infrastructure and platform engineer",
+        "technical support engineer",
+        "application support engineer",
+        "iam",
+        "identity and access management",
+        "openshift",
+    ]
+
+    for pattern in high_intent_title_patterns:
+        if keyword_found(pattern, title_text):
+            curated_bonus += 8
+            break
+
+    if keyword_found("tier a", combined_text) or keyword_found("tier:a", combined_text):
+        curated_bonus += 8
+
+    if keyword_found("easily apply", combined_text):
+        curated_bonus += 2
+
     overall_score = round(
         (role_score * 0.35)
         + (skill_score * 0.35)
         + (experience_score * 0.15)
         + (location_score * 0.15)
+        + curated_bonus
         - penalty_score
     )
 

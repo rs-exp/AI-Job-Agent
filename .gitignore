@@ -31,3 +31,7 @@ data/source_check_results.csv
 
 /reports/*.md
 /reports/*.csv
+
+/imports/*.xlsx
+/imports/*.csv
+/imports/*.xls
