@@ -49,6 +49,10 @@ PIPELINE_STEPS = [
         "name": "Actionable Job Export",
         "script": "agents/actionable_job_exporter.py",
     },
+    {
+        "name": "Application Message Generation",
+        "script": "agents/application_message_generator.py",
+    },
 ]
 
 
