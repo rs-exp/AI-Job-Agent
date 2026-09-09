@@ -318,3 +318,24 @@ ADD COLUMN IF NOT EXISTS last_user_updated_at TIMESTAMP;
 
 CREATE INDEX IF NOT EXISTS idx_job_application_decisions_manual_override
 ON job_application_decisions(manual_override);
+
+CREATE TABLE IF NOT EXISTS application_status_import_log (
+    id SERIAL PRIMARY KEY,
+    file_name TEXT,
+    sheet_name TEXT,
+    row_number INTEGER,
+    detected_status VARCHAR(50),
+    title TEXT,
+    company_name TEXT,
+    job_url TEXT,
+    matched_normalized_job_id INTEGER,
+    match_method VARCHAR(100),
+    import_note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_application_status_import_log_status
+ON application_status_import_log(detected_status);
+
+CREATE INDEX IF NOT EXISTS idx_application_status_import_log_matched_job
+ON application_status_import_log(matched_normalized_job_id);
