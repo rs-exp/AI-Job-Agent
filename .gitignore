@@ -35,3 +35,6 @@ data/source_check_results.csv
 /imports/*.xlsx
 /imports/*.csv
 /imports/*.xls
+
+/exports/*.csv
+/exports/*.md

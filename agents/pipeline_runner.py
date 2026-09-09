@@ -45,6 +45,10 @@ PIPELINE_STEPS = [
         "name": "Top Job Report Generation",
         "script": "agents/job_report_generator.py",
     },
+    {
+        "name": "Actionable Job Export",
+        "script": "agents/actionable_job_exporter.py",
+    },
 ]
 
 
